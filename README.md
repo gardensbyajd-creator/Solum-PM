@@ -46,6 +46,8 @@ The local `.env.local` requires only the Supabase URL and publishable client key
 
 Refer to [STRIPE_WEBHOOK_SETUP.md](./STRIPE_WEBHOOK_SETUP.md) for the complete event and safety rules.
 
+For the remaining owner-side live activation tasks, use [MORNING_LAUNCH_CHECKLIST.md](./MORNING_LAUNCH_CHECKLIST.md).
+
 ## Payment return route
 
 When the public SolumPM website is deployed, set the Enterprise Payment Link success redirect to:
