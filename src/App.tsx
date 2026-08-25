@@ -18,11 +18,12 @@ import {
 } from "lucide-react";
 import { getSupabaseClient, hasSupabasePublicConfig } from "./lib/supabase";
 import { emptyOnboardingDraft, isStepReady, onboardingProgress, onboardingSteps, type OnboardingDraft, type OnboardingStepId } from "./lib/onboarding";
-import { hasCheckoutReturn, resolveInitialWorkspaceView } from "./lib/routing";
+import { hasCheckoutReturn, isPublicLandingPath, resolveInitialWorkspaceView } from "./lib/routing";
 
 type WorkspaceView = "command" | "onboarding" | "seats";
 
 const localDraftKey = "solumpm.organization-onboarding.draft";
+const enterpriseCheckoutUrl = "https://buy.stripe.com/8x29AMbYG89kaMk0Eq4Vy2c";
 
 const activityPlaceholders = [
   { title: "Subscription activation", detail: "Waiting for the first verified Stripe subscription event.", icon: CreditCard },
@@ -32,6 +33,40 @@ const activityPlaceholders = [
 
 function labelForStatus(isSupabaseConfigured: boolean) {
   return isSupabaseConfigured ? "Supabase configured" : "Foundation mode";
+}
+
+function PublicLanding() {
+  return (
+    <main className="public-home">
+      <nav className="public-nav" aria-label="Public navigation">
+        <a className="brand" href="/">Solum<span>PM</span></a>
+        <a className="public-nav-link" href="/onboarding">Already subscribed? <ChevronRight size={15} /></a>
+      </nav>
+      <section className="public-hero">
+        <div className="public-hero-copy">
+          <p className="eyebrow">ONE OPERATING SYSTEM · CLEAR ACCOUNTABILITY</p>
+          <h1>Bring work, decisions and accountability into one calmer operating rhythm.</h1>
+          <p>SolumPM gives organisation leaders a protected command centre, controlled onboarding and a disciplined way to grow internal access without losing governance.</p>
+          <div className="public-actions"><a className="public-primary" href={enterpriseCheckoutUrl}>Subscribe to Enterprise <ArrowUpRight size={17} /></a><a className="public-secondary" href="/onboarding">Continue organisation setup <ChevronRight size={16} /></a></div>
+          <p className="public-microcopy"><ShieldCheck size={15} /> Access activates only after Stripe confirms the subscription.</p>
+        </div>
+        <aside className="enterprise-offer" aria-label="Enterprise membership">
+          <p className="panel-kicker">SOL UMPM ENTERPRISE</p>
+          <div className="price-line"><strong>A$55</strong><span>per month<br />+ GST</span></div>
+          <p>For one organisation and its first 25 named internal users.</p>
+          <ul><li><BadgeCheck size={16} /> 25 named internal seats</li><li><BadgeCheck size={16} /> Master Licence Holder controls</li><li><BadgeCheck size={16} /> Protected organisation onboarding</li><li><BadgeCheck size={16} /> Command-centre foundation</li></ul>
+          <div className="offer-divider" />
+          <p className="additional-seat-note">Need more capacity? Add 25 internal seats for <strong>A$25/month + GST</strong> after your organisation is verified.</p>
+          <a className="offer-link" href={enterpriseCheckoutUrl}>Start Enterprise <ArrowUpRight size={15} /></a>
+        </aside>
+      </section>
+      <section className="public-steps" aria-label="How SolumPM starts">
+        <div><p className="eyebrow">HOW IT STARTS</p><h2>A deliberate path from subscription to operating context.</h2></div>
+        <ol><li><span>01</span><h3>Subscribe</h3><p>Begin with Enterprise membership for the organisation and its first 25 internal seats.</p></li><li><span>02</span><h3>Verify</h3><p>SolumPM verifies the subscription through signed Stripe events before access changes.</p></li><li><span>03</span><h3>Set up</h3><p>The Master Licence Holder claims the organisation and establishes its team, systems and controlled library.</p></li><li><span>04</span><h3>Operate</h3><p>Move into the protected command centre with a clear starting view of readiness and priority work.</p></li></ol>
+      </section>
+      <section className="public-control-strip"><div><p className="eyebrow">BUILT FOR ACCOUNTABLE GROWTH</p><h2>Internal seats are controlled. External access remains separate.</h2></div><p>SolumPM treats named internal staff as governed seats. Client and contractor portal access can be managed separately from Enterprise internal capacity as the workspace grows.</p></section>
+    </main>
+  );
 }
 
 export default function App() {
@@ -47,6 +82,7 @@ export default function App() {
   const [isSavingSetup, setIsSavingSetup] = useState(false);
   const isSupabaseConfigured = hasSupabasePublicConfig();
   const progress = onboardingProgress(draft);
+  const publicLanding = isPublicLandingPath(window.location.pathname);
 
   useEffect(() => {
     try {
@@ -127,6 +163,8 @@ export default function App() {
     if (error) setNotice(error.message);
     else setNotice(`${data.organization.name} has been claimed and its protected setup is recorded with ${data.internalSeatLimit} verified internal seats.`);
   };
+
+  if (publicLanding) return <PublicLanding />;
 
   return (
     <main className="workspace-shell">

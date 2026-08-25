@@ -31,3 +31,5 @@
 - [x] Run focused entitlement, onboarding, seat-administration and command-centre validation before the morning handover.
 - [x] Add Magic Link sign-in and authenticated organisation-claiming controls for the Master Licence Holder.
 - [x] Persist authorised onboarding progress to the organisation instead of relying only on device-local drafts.
+- [x] Build a public SolumPM Enterprise membership landing page that links only to the supplied Enterprise Stripe Payment Link.
+- [x] Verify public landing, post-payment onboarding, protected workspace and mobile-responsive presentation before handover.
