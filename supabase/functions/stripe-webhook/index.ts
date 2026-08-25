@@ -153,15 +153,25 @@ Deno.serve(async (request) => {
 
   const supabase = createClient(supabaseUrl, serviceRoleKey);
   const object = event.data.object;
-  const { error: eventError } = await supabase.from("stripe_webhook_events").insert({
+  const { data: previousEvent, error: previousEventError } = await supabase
+    .from("stripe_webhook_events")
+    .select("outcome")
+    .eq("stripe_event_id", event.id)
+    .maybeSingle();
+  if (previousEventError) return json({ error: "Unable to inspect event history" }, 500);
+  if (previousEvent?.outcome === "processed" || previousEvent?.outcome === "ignored") {
+    return json({ received: true, duplicate: true });
+  }
+
+  const { error: eventError } = await supabase.from("stripe_webhook_events").upsert({
     stripe_event_id: event.id,
     event_type: event.type,
     stripe_customer_id: stringValue(object.customer),
     stripe_subscription_id: stringValue(object.subscription) ?? stringValue(object.id),
     event_payload: event,
-  });
-
-  if (eventError?.code === "23505") return json({ received: true, duplicate: true });
+    outcome: "received",
+    processed_at: null,
+  }, { onConflict: "stripe_event_id" });
   if (eventError) return json({ error: "Unable to record event" }, 500);
 
   try {

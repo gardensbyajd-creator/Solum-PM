@@ -7,12 +7,12 @@
 - [x] Build only in gardensbyajd-creator/Solum-PM and use only Supabase project cvqualjefkorrwiqsxkv.
 - [x] Preserve and do not access or modify Supabase project zwosjcpoekpbmfjfnela.
 - [x] Define a single Enterprise membership entitlement with 25 named internal user seats.
-- [ ] Design the administrator seat-allocation, invitation and seat-limit enforcement experience.
-- [ ] Prepare Stripe subscription-confirmation and Supabase entitlement synchronisation without storing payment credentials in the application.
+- [x] Design the administrator seat-allocation, invitation and seat-limit enforcement experience.
+- [x] Prepare Stripe subscription-confirmation and Supabase entitlement synchronisation without storing payment credentials in the application.
 - [x] Add and run focused membership entitlement and 25-seat enforcement tests.
-- [ ] Set an approved monthly Enterprise base price covering the first 25 named internal seats.
-- [ ] Configure a recurring Stripe add-on for each additional 25 named internal-seat block.
-- [ ] Configure the Enterprise Stripe Payment Link at A$55 per month plus GST for the first 25 named internal seats.
+- [x] Set an approved monthly Enterprise base price covering the first 25 named internal seats.
+- [x] Configure a recurring Stripe add-on for each additional 25 named internal-seat block.
+- [x] Configure the Enterprise Stripe Payment Link at A$55 per month plus GST for the first 25 named internal seats.
 - [ ] Confirm the minimum required Stripe Payment Link checkout fields and terms acceptance before activation.
 - [ ] Configure an Enterprise post-payment success path that directs confirmed subscribers into SolumPM organisation onboarding.
 - [ ] Retain Stripe Billing invoices as the payment record rather than duplicating invoice generation in the application.
@@ -20,6 +20,14 @@
 - [ ] Configure the additional-seat Stripe product as a fixed A$25 recurring 25-seat block with customer quantity adjustment disabled.
 - [ ] Define separate verified post-payment handling for Enterprise membership and additional-seat purchases.
 - [x] Build one signed Stripe webhook endpoint for Enterprise membership and Additional 25 Internal Seats subscription events.
-- [ ] Map the Enterprise Payment Link and Additional 25 Internal Seats Payment Link to their respective seat-entitlement actions.
+- [x] Map the Enterprise Payment Link and Additional 25 Internal Seats Payment Link to their respective seat-entitlement actions.
 - [x] Map Stripe price_1U8GLo3a72jjBENAGvEHaHnO to the 25-seat Enterprise entitlement and price_1U8GMR3a72jjBENA78NPrMe9 to one additional 25-seat block.
-- [ ] Keep Stripe webhook delivery on the designated Supabase function URL; defer GoDaddy DNS changes until public SolumPM domain launch.
+- [x] Keep Stripe webhook delivery on the designated Supabase function URL; defer GoDaddy DNS changes until public SolumPM domain launch.
+- [ ] Ensure the shared Stripe event destination includes customer.subscription.created so first-time Enterprise purchases receive their initial 25-seat entitlement.
+- [ ] Harden Stripe event ordering, reconciliation and test-mode entitlement verification for both supplied subscription prices.
+- [x] Build a protected organisation onboarding workspace that follows a confirmed Enterprise entitlement.
+- [x] Build a Master Licence Holder seat-administration workspace that enforces the available internal-seat capacity.
+- [x] Create a role-aware operational command centre with business-health signals, quick actions and a unified activity feed.
+- [x] Run focused entitlement, onboarding, seat-administration and command-centre validation before the morning handover.
+- [x] Add Magic Link sign-in and authenticated organisation-claiming controls for the Master Licence Holder.
+- [x] Persist authorised onboarding progress to the organisation instead of relying only on device-local drafts.

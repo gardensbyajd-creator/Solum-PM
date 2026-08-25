@@ -10,6 +10,16 @@ https://cvqualjefkorrwiqsxkv.supabase.co/functions/v1/stripe-webhook
 
 The function is deployed in the `cvqualjefkorrwiqsxkv` Supabase project as `stripe-webhook`. It uses signed Stripe webhook verification rather than browser redirects to grant or change access.
 
+## Post-payment redirect
+
+Once the public SolumPM domain is connected, set the Enterprise Payment Link redirect to:
+
+```text
+https://solumpm.com/onboarding?session_id={CHECKOUT_SESSION_ID}
+```
+
+The onboarding route gives the subscriber a branded next step, but it does not grant access. The signed Stripe webhook remains the only source of entitlement activation.
+
 ## Price mappings
 
 | Subscription product | Stripe price ID | Entitlement result |
@@ -24,6 +34,7 @@ Create one event destination with the following events:
 | Event | Purpose |
 |---|---|
 | `checkout.session.completed` | Creates the pending organisation record for a successful checkout. |
+| `customer.subscription.created` | Creates the subscription record and calculates the initial 25-seat entitlement. |
 | `invoice.paid` | Records payment confirmation for reconciliation. |
 | `invoice.payment_failed` | Records a payment-attention event. |
 | `customer.subscription.updated` | Updates subscription status, items and the calculated seat allowance. |
