@@ -22,6 +22,14 @@ import { hasCheckoutReturn, isPublicLandingPath, resolveInitialWorkspaceView } f
 
 type WorkspaceView = "command" | "onboarding" | "seats";
 
+type OrganizationContext = {
+  claimed: boolean;
+  organization?: { id: string; name: string };
+  entitlement?: { internal_seat_limit: number; subscription_state: "active" | "payment_attention" | "inactive" };
+  onboarding?: { status: string; current_step: number };
+  occupiedSeats?: number;
+};
+
 const localDraftKey = "solumpm.organization-onboarding.draft";
 const enterpriseCheckoutUrl = "https://buy.stripe.com/8x29AMbYG89kaMk0Eq4Vy2c";
 
@@ -80,9 +88,14 @@ export default function App() {
   const [showSignIn, setShowSignIn] = useState(false);
   const [isAuthenticating, setIsAuthenticating] = useState(false);
   const [isSavingSetup, setIsSavingSetup] = useState(false);
+  const [organizationContext, setOrganizationContext] = useState<OrganizationContext | null>(null);
   const isSupabaseConfigured = hasSupabasePublicConfig();
   const progress = onboardingProgress(draft);
   const publicLanding = isPublicLandingPath(window.location.pathname);
+  const verifiedSeatLimit = organizationContext?.claimed ? organizationContext.entitlement?.internal_seat_limit ?? 0 : 0;
+  const occupiedSeats = organizationContext?.claimed ? organizationContext.occupiedSeats ?? 0 : 0;
+  const verifiedSeatText = `${occupiedSeats} / ${verifiedSeatLimit}`;
+  const subscriptionIsActive = organizationContext?.entitlement?.subscription_state === "active";
 
   useEffect(() => {
     try {
@@ -114,6 +127,17 @@ export default function App() {
     });
     return () => authState.subscription.unsubscribe();
   }, []);
+
+  useEffect(() => {
+    const client = getSupabaseClient();
+    if (!client || !signedInEmail) {
+      setOrganizationContext(null);
+      return;
+    }
+    client.functions.invoke("organization-context").then(({ data, error }) => {
+      if (!error && data) setOrganizationContext(data as OrganizationContext);
+    });
+  }, [signedInEmail]);
 
   const updateDraft = (field: keyof OnboardingDraft) => (event: ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     setDraft((current) => ({ ...current, [field]: event.target.value }));
@@ -213,7 +237,7 @@ export default function App() {
               <div>
                 <p className="eyebrow">LIVE OPERATIONS · FOUNDATION</p>
                 <h1 id="command-title">A calmer view of what needs your attention.</h1>
-                <p className="lead-copy">Start with organisation readiness, then move into operational delivery as confirmed subscription, team and project data arrives.</p>
+                <p className="lead-copy">{organizationContext?.organization?.name ? `${organizationContext.organization.name} is ready to move from setup into operational delivery as verified data arrives.` : "Start with organisation readiness, then move into operational delivery as confirmed subscription, team and project data arrives."}</p>
               </div>
               <button className="primary-button" onClick={() => jumpTo("onboarding")}>Set up organisation <ArrowUpRight size={17} /></button>
             </div>
@@ -222,7 +246,7 @@ export default function App() {
               <div className="readiness-copy">
                 <p className="panel-kicker">ORGANISATION READINESS</p>
                 <h2>{progress.completed} of {progress.total} setup areas prepared</h2>
-                <p>Your setup draft is saved locally on this device until the first verified organisation entitlement is available.</p>
+                <p>{subscriptionIsActive ? "Your verified entitlement is active. Complete onboarding to establish the protected operating context." : "Your setup draft is saved locally on this device until the first verified organisation entitlement is available."}</p>
               </div>
               <div className="readiness-progress" aria-label={`${progress.percentage}% onboarding progress`}>
                 <span>{progress.percentage}%</span>
@@ -234,7 +258,7 @@ export default function App() {
             <section className="metric-grid" aria-label="Operational health">
               <article className="metric-card"><div className="metric-icon metric-icon--sage"><ClipboardList size={20} /></div><p>Projects</p><strong>—</strong><span>Awaiting initial project records</span></article>
               <article className="metric-card"><div className="metric-icon metric-icon--gold"><ShieldCheck size={20} /></div><p>Safety readiness</p><strong>—</strong><span>Awaiting WHS baseline</span></article>
-              <article className="metric-card"><div className="metric-icon metric-icon--blue"><UsersRound size={20} /></div><p>Internal seats</p><strong>0 / 0</strong><span>Waiting for entitlement confirmation</span></article>
+              <article className="metric-card"><div className="metric-icon metric-icon--blue"><UsersRound size={20} /></div><p>Internal seats</p><strong>{verifiedSeatText}</strong><span>{subscriptionIsActive ? "Verified organisational capacity" : "Waiting for entitlement confirmation"}</span></article>
               <article className="metric-card"><div className="metric-icon metric-icon--rose"><Gauge size={20} /></div><p>Priority actions</p><strong>0</strong><span>No verified operational events yet</span></article>
             </section>
 
@@ -284,7 +308,7 @@ export default function App() {
         {view === "seats" && (
           <section className="content-view seats-view" aria-labelledby="seats-title">
             <div className="page-intro compact-intro"><div><p className="eyebrow">INTERNAL ACCESS ADMINISTRATION</p><h1 id="seats-title">Seat allocation stays inside verified organisational capacity.</h1><p className="lead-copy">Only named internal staff consume the Enterprise seat allowance. Client, contractor and limited external portal access are governed separately.</p></div><button className="primary-button" onClick={() => setNotice("Seat invitations will unlock once Stripe confirms an active Enterprise entitlement.")}>Invite internal user <Plus size={17} /></button></div>
-            <section className="seat-summary-grid"><article className="seat-summary seat-summary--primary"><p>Verified internal capacity</p><strong>0 <span>/ 0</span></strong><small>Waiting for confirmed Enterprise subscription</small></article><article className="seat-summary"><p>Enterprise allowance</p><strong>25</strong><small>Available after first confirmed subscription</small></article><article className="seat-summary"><p>Additional blocks</p><strong>+25</strong><small>Each verified add-on expands internal capacity</small></article></section>
+            <section className="seat-summary-grid"><article className="seat-summary seat-summary--primary"><p>Verified internal capacity</p><strong>{occupiedSeats} <span>/ {verifiedSeatLimit}</span></strong><small>{subscriptionIsActive ? "Active verified capacity" : "Waiting for confirmed Enterprise subscription"}</small></article><article className="seat-summary"><p>Enterprise allowance</p><strong>25</strong><small>Available after first confirmed subscription</small></article><article className="seat-summary"><p>Additional blocks</p><strong>+25</strong><small>Each verified add-on expands internal capacity</small></article></section>
             <article className="surface-card seat-policy-card"><div className="surface-heading"><div><p className="panel-kicker">ALLOCATION GUARDRAILS</p><h2>How SolumPM keeps access accountable</h2></div><LockKeyhole size={21} /></div><div className="guardrail-grid"><div><span>01</span><h3>Verified subscription</h3><p>Internal-seat invitations are blocked until the signed Stripe event confirms an active Enterprise entitlement.</p></div><div><span>02</span><h3>Named internal users</h3><p>Each invitation consumes one seat until the user is released. External portal users do not consume paid internal capacity.</p></div><div><span>03</span><h3>Controlled expansion</h3><p>Each verified Additional 25 Internal Seats subscription increases the organisational limit by exactly 25 seats.</p></div></div></article>
           </section>
         )}
