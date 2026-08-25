@@ -14,6 +14,12 @@ SolumPM is an independent operational-platform foundation. This repository conne
 | Stripe webhook | Deployed as `stripe-webhook`; verifies signed Stripe events before entitlement changes |
 | Supabase model | RLS-enabled organisations, subscriptions, entitlement, seats, onboarding, activity and membership tables applied |
 
+## Data-access posture
+
+All operational and billing tables have Row Level Security enabled. The browser does not receive direct table permissions; it reads or changes protected organisation data through JWT-protected Edge Functions. The `stripe-webhook` function is the only custom-authenticated exception because Stripe cannot present a Supabase user JWT; it verifies Stripe’s raw signed payload instead.
+
+The Supabase security advisor may list **RLS enabled with no direct policy** as informational notices. This is intentional for this foundation: direct browser access is denied, while trusted Edge Functions use the service role only after validating the caller or webhook signature. Privileged entitlement-maintenance functions have explicitly had anonymous and signed-in execution revoked.
+
 ## Local development
 
 ```bash

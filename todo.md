@@ -34,3 +34,4 @@
 - [x] Build a public SolumPM Enterprise membership landing page that links only to the supplied Enterprise Stripe Payment Link.
 - [x] Verify public landing, post-payment onboarding, protected workspace and mobile-responsive presentation before handover.
 - [x] Connect the authenticated command centre and seat workspace to the verified organisation entitlement, onboarding and activity context.
+- [x] Revoke anonymous and authenticated execution of privileged entitlement-maintenance functions and re-run Supabase security advisories.
