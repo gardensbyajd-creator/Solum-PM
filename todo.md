@@ -36,3 +36,4 @@
 - [x] Connect the authenticated command centre and seat workspace to the verified organisation entitlement, onboarding and activity context.
 - [x] Revoke anonymous and authenticated execution of privileged entitlement-maintenance functions and re-run Supabase security advisories.
 - [x] Verify the public Supabase client is denied when attempting to execute privileged entitlement-maintenance functions.
+- [x] Apply a covering index for Stripe subscription-item price lookups and retain currently unused operational indexes until live workload data exists.
