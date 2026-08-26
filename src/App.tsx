@@ -24,7 +24,7 @@ import { emptyOnboardingDraft, isStepReady, onboardingProgress, onboardingSteps,
 import { hasCheckoutReturn, isPublicLandingPath, resolveInitialWorkspaceView } from "./lib/routing";
 import { canManageInternalSeats, internalSeatRoles, isSeatInviteReady, normaliseSeatInvite, type InternalSeatRole } from "./lib/seatAdmin";
 
-type WorkspaceView = "command" | "onboarding" | "seats" | "work" | "library" | "reports";
+type WorkspaceView = "command" | "onboarding" | "seats" | "work" | "library" | "reports" | "inbox";
 
 type OrganizationContext = {
   claimed: boolean;
@@ -132,6 +132,12 @@ export default function App() {
   const activeLibraryCount = libraryItems.filter((item) => item.lifecycle_status === "active").length;
   const attentionWork = workItems.filter((item) => item.status !== "complete" && ["attention", "critical"].includes(item.risk_level));
   const upcomingWork = workItems.filter((item) => item.status !== "complete" && item.due_date && new Date(`${item.due_date}T00:00:00`).getTime() <= Date.now() + 14 * 86_400_000).sort((a, b) => (a.due_date ?? "").localeCompare(b.due_date ?? ""));
+  const reviewDueItems = libraryItems.filter((item) => item.lifecycle_status === "active" && item.review_date && new Date(`${item.review_date}T00:00:00`).getTime() <= Date.now() + 14 * 86_400_000).sort((a, b) => (a.review_date ?? "").localeCompare(b.review_date ?? ""));
+  const inboxItems = [
+    ...attentionWork.map((item) => ({ id: `risk-${item.id}`, type: "Risk signal", title: item.title, detail: `${item.risk_level} · ${item.owner_label || "Owner not assigned"}`, destination: "work" as WorkspaceView, tone: item.risk_level })),
+    ...upcomingWork.map((item) => ({ id: `due-${item.id}`, type: "Due commitment", title: item.title, detail: item.due_date ? `Due ${new Date(`${item.due_date}T00:00:00`).toLocaleDateString("en-AU", { day: "numeric", month: "short" })}` : "Date required", destination: "work" as WorkspaceView, tone: "attention" })),
+    ...reviewDueItems.map((item) => ({ id: `review-${item.id}`, type: "Library review", title: item.title, detail: item.review_date ? `Review ${new Date(`${item.review_date}T00:00:00`).toLocaleDateString("en-AU", { day: "numeric", month: "short" })}` : "Review date required", destination: "library" as WorkspaceView, tone: "standard" })),
+  ].slice(0, 12);
 
   useEffect(() => {
     try {
@@ -355,6 +361,9 @@ export default function App() {
           <button className={view === "reports" ? "nav-item nav-item--active" : "nav-item"} onClick={() => jumpTo("reports")}>
             <ChartNoAxesCombined size={18} aria-hidden="true" /> Decision brief
           </button>
+          <button className={view === "inbox" ? "nav-item nav-item--active" : "nav-item"} onClick={() => jumpTo("inbox")}>
+            <BellRing size={18} aria-hidden="true" /> Action inbox {inboxItems.length ? <em>{inboxItems.length}</em> : null}
+          </button>
         </nav>
 
         <div className="sidebar-footnote">
@@ -370,7 +379,7 @@ export default function App() {
             <span>{labelForStatus(isSupabaseConfigured)}</span>
           </div>
           <div className="topbar-actions">
-            <button className="icon-button" aria-label="Notifications"><BellRing size={18} /></button>
+            <button className="icon-button" aria-label="Action inbox" onClick={() => jumpTo("inbox")}><BellRing size={18} /></button>
             <button className="profile-chip" onClick={() => setShowSignIn(true)}><CircleUserRound size={19} /> {signedInEmail ?? "Secure sign in"} <ChevronRight size={15} /></button>
           </div>
         </header>
@@ -489,6 +498,13 @@ export default function App() {
             <div className="page-intro compact-intro"><div><p className="eyebrow">OPERATIONAL DECISION BRIEF</p><h1 id="reports-title">A concise view of what requires leadership attention.</h1><p className="lead-copy">This brief uses the verified organisation work register and controlled-library lifecycle. It does not fabricate live performance measures that have not yet been recorded.</p></div></div>
             <section className="report-metric-grid" aria-label="Decision brief metrics"><article className="report-metric"><p>Open priority actions</p><strong>{priorityCount}</strong><span>From the organisation work register</span></article><article className="report-metric"><p>Attention signals</p><strong>{attentionWork.length}</strong><span>Attention or critical open items</span></article><article className="report-metric"><p>Due in next 14 days</p><strong>{upcomingWork.length}</strong><span>Open dated commitments</span></article><article className="report-metric"><p>Active controlled items</p><strong>{activeLibraryCount}</strong><span>Policies, procedures and forms</span></article></section>
             <section className="report-detail-grid"><article className="surface-card report-list-card"><div className="surface-heading"><div><p className="panel-kicker">LEADERSHIP ATTENTION</p><h2>Open risk signals</h2></div><Gauge size={21} /></div><div className="work-list">{attentionWork.length ? attentionWork.map((item) => <div className="work-item" key={item.id}><div><span className={`risk-dot risk-dot--${item.risk_level}`} /><strong>{item.title}</strong><p>{item.risk_level} · {item.owner_label || "Owner not assigned"} · {item.status.replace("_", " ")}</p></div><button className="text-button" onClick={() => jumpTo("work")}>Review <ChevronRight size={15} /></button></div>) : <p className="seat-helper">No attention or critical work items have been recorded.</p>}</div></article><article className="surface-card report-list-card"><div className="surface-heading"><div><p className="panel-kicker">DELIVERY HORIZON</p><h2>Upcoming commitments</h2></div><CalendarDays size={21} /></div><div className="work-list">{upcomingWork.length ? upcomingWork.map((item) => <div className="work-item" key={item.id}><div><strong>{item.title}</strong><p>{item.due_date ? new Date(`${item.due_date}T00:00:00`).toLocaleDateString("en-AU", { day: "numeric", month: "long" }) : "No due date"} · {item.owner_label || "Owner not assigned"}</p></div><span className="work-status">{item.status.replace("_", " ")}</span></div>) : <p className="seat-helper">No open work items are due within the next 14 days.</p>}</div></article></section>
+          </section>
+        )}
+
+        {view === "inbox" && (
+          <section className="content-view inbox-view" aria-labelledby="inbox-title">
+            <div className="page-intro compact-intro"><div><p className="eyebrow">ACCOUNTABILITY RADAR</p><h1 id="inbox-title">Keep the next operational decisions in one clear queue.</h1><p className="lead-copy">This inbox derives its content from verified organisation records. It does not create artificial alerts or conceal items that need a named owner.</p></div><span className="inbox-count">{inboxItems.length} open</span></div>
+            <article className="surface-card inbox-card"><div className="surface-heading"><div><p className="panel-kicker">ACTION QUEUE</p><h2>Attention requiring follow-through</h2></div><BellRing size={21} /></div><div className="inbox-list">{inboxItems.length ? inboxItems.map((item) => <button className="inbox-item" key={item.id} onClick={() => jumpTo(item.destination)}><span className={`risk-dot risk-dot--${item.tone}`} /><span className="inbox-item-copy"><small>{item.type}</small><strong>{item.title}</strong><p>{item.detail}</p></span><ChevronRight size={18} /></button>) : <div className="inbox-empty"><BadgeCheck size={23} /><div><strong>No verified actions require immediate attention.</strong><p>Continue adding projects, priority actions and controlled-library review dates as operating records become available.</p></div></div>}</div></article>
           </section>
         )}
       </section>

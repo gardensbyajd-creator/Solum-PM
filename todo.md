@@ -61,3 +61,4 @@
 - [x] Add an operational detail workspace with accountable notes and due dates for projects and priority actions.
 - [x] Build an organisation-scoped controlled-library register for policies, procedures and forms with lifecycle status visibility.
 - [x] Add an operational reporting surface that turns verified work, risk and library lifecycle records into a concise decision brief.
+- [x] Add a derived action inbox that consolidates due work, risk signals and controlled-library review dates into accountable next steps.
