@@ -11,6 +11,7 @@ import {
   CreditCard,
   Gauge,
   LayoutDashboard,
+  ListTodo,
   LockKeyhole,
   Plus,
   ShieldCheck,
@@ -19,8 +20,9 @@ import {
 import { getSupabaseClient, hasSupabasePublicConfig } from "./lib/supabase";
 import { emptyOnboardingDraft, isStepReady, onboardingProgress, onboardingSteps, type OnboardingDraft, type OnboardingStepId } from "./lib/onboarding";
 import { hasCheckoutReturn, isPublicLandingPath, resolveInitialWorkspaceView } from "./lib/routing";
+import { canManageInternalSeats, internalSeatRoles, isSeatInviteReady, normaliseSeatInvite, type InternalSeatRole } from "./lib/seatAdmin";
 
-type WorkspaceView = "command" | "onboarding" | "seats";
+type WorkspaceView = "command" | "onboarding" | "seats" | "work";
 
 type OrganizationContext = {
   claimed: boolean;
@@ -28,6 +30,10 @@ type OrganizationContext = {
   entitlement?: { internal_seat_limit: number; subscription_state: "active" | "payment_attention" | "inactive" };
   onboarding?: { status: string; current_step: number };
   occupiedSeats?: number;
+  role?: string;
+  seats?: Array<{ id: string; email: string; display_name: string | null; role_name: string; seat_status: "invited" | "active" | "released"; invited_at: string; activated_at: string | null }>;
+  activity?: Array<{ title: string; detail: string | null; created_at: string }>;
+  workItems?: Array<{ id: string; work_type: "project" | "priority_action"; title: string; detail: string | null; status: "planned" | "in_progress" | "blocked" | "complete"; risk_level: "standard" | "attention" | "critical"; owner_label: string | null; due_date: string | null; created_at: string; updated_at: string }>;
 };
 
 const localDraftKey = "solumpm.organization-onboarding.draft";
@@ -89,6 +95,15 @@ export default function App() {
   const [isAuthenticating, setIsAuthenticating] = useState(false);
   const [isSavingSetup, setIsSavingSetup] = useState(false);
   const [organizationContext, setOrganizationContext] = useState<OrganizationContext | null>(null);
+  const [inviteEmail, setInviteEmail] = useState("");
+  const [inviteName, setInviteName] = useState("");
+  const [inviteRole, setInviteRole] = useState<InternalSeatRole>("member");
+  const [isInviting, setIsInviting] = useState(false);
+  const [workTitle, setWorkTitle] = useState("");
+  const [workType, setWorkType] = useState<"project" | "priority_action">("priority_action");
+  const [workRisk, setWorkRisk] = useState<"standard" | "attention" | "critical">("standard");
+  const [workOwner, setWorkOwner] = useState("");
+  const [isCreatingWork, setIsCreatingWork] = useState(false);
   const isSupabaseConfigured = hasSupabasePublicConfig();
   const progress = onboardingProgress(draft);
   const publicLanding = isPublicLandingPath(window.location.pathname);
@@ -96,6 +111,10 @@ export default function App() {
   const occupiedSeats = organizationContext?.claimed ? organizationContext.occupiedSeats ?? 0 : 0;
   const verifiedSeatText = `${occupiedSeats} / ${verifiedSeatLimit}`;
   const subscriptionIsActive = organizationContext?.entitlement?.subscription_state === "active";
+  const canManageSeats = canManageInternalSeats(organizationContext?.role);
+  const workItems = organizationContext?.workItems ?? [];
+  const projectCount = workItems.filter((item) => item.work_type === "project").length;
+  const priorityCount = workItems.filter((item) => item.work_type === "priority_action" && item.status !== "complete").length;
 
   useEffect(() => {
     try {
@@ -188,6 +207,49 @@ export default function App() {
     else setNotice(`${data.organization.name} has been claimed and its protected setup is recorded with ${data.internalSeatLimit} verified internal seats.`);
   };
 
+  const inviteInternalUser = async () => {
+    const client = getSupabaseClient();
+    const normalised = normaliseSeatInvite({ email: inviteEmail, displayName: inviteName, roleName: inviteRole });
+    if (!client || !isSeatInviteReady(normalised)) {
+      setNotice("Enter a valid internal email and select Administrator or Member access.");
+      return;
+    }
+    setIsInviting(true);
+    const { error } = await client.functions.invoke("organization-seat-invite", { body: normalised });
+    setIsInviting(false);
+    if (error) {
+      setNotice(error.message);
+      return;
+    }
+    const { data: refreshedContext, error: refreshError } = await client.functions.invoke("organization-context");
+    if (!refreshError && refreshedContext) setOrganizationContext(refreshedContext as OrganizationContext);
+    setInviteEmail("");
+    setInviteName("");
+    setInviteRole("member");
+    setNotice(`${normalised.email} has been allocated an internal seat and can activate access with their Magic Link.`);
+  };
+
+  const createWorkItem = async () => {
+    const client = getSupabaseClient();
+    if (!client || workTitle.trim().length < 3) {
+      setNotice("Enter a clear work title before recording it.");
+      return;
+    }
+    setIsCreatingWork(true);
+    const { error } = await client.functions.invoke("operational-work-items", { body: { workType, title: workTitle.trim(), riskLevel: workRisk, ownerLabel: workOwner.trim() } });
+    setIsCreatingWork(false);
+    if (error) {
+      setNotice(error.message);
+      return;
+    }
+    const { data: refreshedContext, error: refreshError } = await client.functions.invoke("organization-context");
+    if (!refreshError && refreshedContext) setOrganizationContext(refreshedContext as OrganizationContext);
+    setNotice(`${workType === "project" ? "Project" : "Priority action"} recorded in the organisation work register.`);
+    setWorkTitle("");
+    setWorkOwner("");
+    setWorkRisk("standard");
+  };
+
   if (publicLanding) return <PublicLanding />;
 
   return (
@@ -207,6 +269,9 @@ export default function App() {
           </button>
           <button className={view === "seats" ? "nav-item nav-item--active" : "nav-item"} onClick={() => jumpTo("seats")}>
             <UsersRound size={18} aria-hidden="true" /> Internal seats
+          </button>
+          <button className={view === "work" ? "nav-item nav-item--active" : "nav-item"} onClick={() => jumpTo("work")}>
+            <ListTodo size={18} aria-hidden="true" /> Work register
           </button>
         </nav>
 
@@ -256,17 +321,17 @@ export default function App() {
             </section>
 
             <section className="metric-grid" aria-label="Operational health">
-              <article className="metric-card"><div className="metric-icon metric-icon--sage"><ClipboardList size={20} /></div><p>Projects</p><strong>—</strong><span>Awaiting initial project records</span></article>
+              <article className="metric-card"><div className="metric-icon metric-icon--sage"><ClipboardList size={20} /></div><p>Projects</p><strong>{projectCount || "—"}</strong><span>{projectCount ? "Organisation-scoped work register" : "Awaiting initial project records"}</span></article>
               <article className="metric-card"><div className="metric-icon metric-icon--gold"><ShieldCheck size={20} /></div><p>Safety readiness</p><strong>—</strong><span>Awaiting WHS baseline</span></article>
               <article className="metric-card"><div className="metric-icon metric-icon--blue"><UsersRound size={20} /></div><p>Internal seats</p><strong>{verifiedSeatText}</strong><span>{subscriptionIsActive ? "Verified organisational capacity" : "Waiting for entitlement confirmation"}</span></article>
-              <article className="metric-card"><div className="metric-icon metric-icon--rose"><Gauge size={20} /></div><p>Priority actions</p><strong>0</strong><span>No verified operational events yet</span></article>
+              <article className="metric-card"><div className="metric-icon metric-icon--rose"><Gauge size={20} /></div><p>Priority actions</p><strong>{priorityCount}</strong><span>{priorityCount ? "Open organisation actions" : "No verified operational events yet"}</span></article>
             </section>
 
             <section className="command-grid">
               <article className="surface-card activity-card">
                 <div className="surface-heading"><div><p className="panel-kicker">UNIFIED ACTIVITY</p><h2>Operational feed</h2></div><button className="text-button">View all <ChevronRight size={15} /></button></div>
                 <div className="activity-list">
-                  {activityPlaceholders.map(({ title, detail, icon: Icon }) => (
+                  {(organizationContext?.activity?.length ? organizationContext.activity.map((item) => ({ title: item.title, detail: item.detail ?? "Organisation activity recorded", icon: ClipboardList })) : activityPlaceholders).map(({ title, detail, icon: Icon }) => (
                     <div className="activity-item" key={title}><div className="activity-icon"><Icon size={17} /></div><div><h3>{title}</h3><p>{detail}</p></div><span>Pending</span></div>
                   ))}
                 </div>
@@ -307,9 +372,23 @@ export default function App() {
 
         {view === "seats" && (
           <section className="content-view seats-view" aria-labelledby="seats-title">
-            <div className="page-intro compact-intro"><div><p className="eyebrow">INTERNAL ACCESS ADMINISTRATION</p><h1 id="seats-title">Seat allocation stays inside verified organisational capacity.</h1><p className="lead-copy">Only named internal staff consume the Enterprise seat allowance. Client, contractor and limited external portal access are governed separately.</p></div><button className="primary-button" onClick={() => setNotice("Seat invitations will unlock once Stripe confirms an active Enterprise entitlement.")}>Invite internal user <Plus size={17} /></button></div>
+            <div className="page-intro compact-intro"><div><p className="eyebrow">INTERNAL ACCESS ADMINISTRATION</p><h1 id="seats-title">Seat allocation stays inside verified organisational capacity.</h1><p className="lead-copy">Only named internal staff consume the Enterprise seat allowance. Client, contractor and limited external portal access are governed separately.</p></div><button className="primary-button" onClick={() => document.getElementById("invite-internal-user")?.scrollIntoView({ behavior: "smooth" })} disabled={!subscriptionIsActive || !canManageSeats}>Invite internal user <Plus size={17} /></button></div>
             <section className="seat-summary-grid"><article className="seat-summary seat-summary--primary"><p>Verified internal capacity</p><strong>{occupiedSeats} <span>/ {verifiedSeatLimit}</span></strong><small>{subscriptionIsActive ? "Active verified capacity" : "Waiting for confirmed Enterprise subscription"}</small></article><article className="seat-summary"><p>Enterprise allowance</p><strong>25</strong><small>Available after first confirmed subscription</small></article><article className="seat-summary"><p>Additional blocks</p><strong>+25</strong><small>Each verified add-on expands internal capacity</small></article></section>
             <article className="surface-card seat-policy-card"><div className="surface-heading"><div><p className="panel-kicker">ALLOCATION GUARDRAILS</p><h2>How SolumPM keeps access accountable</h2></div><LockKeyhole size={21} /></div><div className="guardrail-grid"><div><span>01</span><h3>Verified subscription</h3><p>Internal-seat invitations are blocked until the signed Stripe event confirms an active Enterprise entitlement.</p></div><div><span>02</span><h3>Named internal users</h3><p>Each invitation consumes one seat until the user is released. External portal users do not consume paid internal capacity.</p></div><div><span>03</span><h3>Controlled expansion</h3><p>Each verified Additional 25 Internal Seats subscription increases the organisational limit by exactly 25 seats.</p></div></div></article>
+            <section className="seat-admin-grid">
+              <article className="surface-card invite-seat-card" id="invite-internal-user"><div className="surface-heading"><div><p className="panel-kicker">ALLOCATE INTERNAL SEAT</p><h2>Invite a named team member</h2></div><UsersRound size={21} /></div><p className="membership-copy">Invited people occupy one verified internal seat. They activate access only after signing in with the invited email address.</p><div className="invite-grid"><label>Full name<input value={inviteName} onChange={(event) => setInviteName(event.target.value)} placeholder="e.g. Taylor Green" disabled={!canManageSeats || !subscriptionIsActive} /></label><label>Work email<input type="email" value={inviteEmail} onChange={(event) => setInviteEmail(event.target.value)} placeholder="team.member@organisation.com.au" disabled={!canManageSeats || !subscriptionIsActive} /></label><label>Access role<select value={inviteRole} onChange={(event) => setInviteRole(event.target.value as InternalSeatRole)} disabled={!canManageSeats || !subscriptionIsActive}>{internalSeatRoles.map((role) => <option key={role.value} value={role.value}>{role.label}</option>)}</select></label></div><button className="primary-button" onClick={inviteInternalUser} disabled={!canManageSeats || !subscriptionIsActive || !isSeatInviteReady({ email: inviteEmail, roleName: inviteRole }) || isInviting}>{isInviting ? "Allocating…" : "Allocate internal seat"} <ArrowUpRight size={16} /></button>{!canManageSeats && <p className="seat-helper">Only the Master Licence Holder or an administrator can allocate internal seats.</p>}</article>
+              <article className="surface-card seat-register-card"><div className="surface-heading"><div><p className="panel-kicker">CURRENT ALLOCATION</p><h2>Named internal access</h2></div><span className="seat-count-pill">{verifiedSeatText}</span></div><div className="seat-register">{organizationContext?.seats?.filter((seat) => seat.seat_status !== "released").map((seat) => <div className="seat-register-item" key={seat.id}><div><strong>{seat.display_name || seat.email}</strong><p>{seat.email} · {seat.role_name.replace("_", " ")}</p></div><span className={seat.seat_status === "active" ? "seat-status seat-status--active" : "seat-status"}>{seat.seat_status}</span></div>) ?? <p className="seat-helper">Sign in and claim the organisation to view allocated internal seats.</p>}</div></article>
+            </section>
+          </section>
+        )}
+
+        {view === "work" && (
+          <section className="content-view work-view" aria-labelledby="work-title">
+            <div className="page-intro compact-intro"><div><p className="eyebrow">ORGANISATION WORK REGISTER</p><h1 id="work-title">Record the work that turns readiness into operating rhythm.</h1><p className="lead-copy">Projects and priority actions are held within the verified organisation context, then surfaced in the command centre for accountable follow-through.</p></div></div>
+            <section className="work-register-grid">
+              <article className="surface-card work-entry-card"><div className="surface-heading"><div><p className="panel-kicker">NEW REGISTER ITEM</p><h2>Capture a project or priority action</h2></div><ListTodo size={21} /></div><div className="invite-grid"><label>Record type<select value={workType} onChange={(event) => setWorkType(event.target.value as "project" | "priority_action")} disabled={!organizationContext?.claimed}><option value="priority_action">Priority action</option><option value="project">Project</option></select></label><label>Risk signal<select value={workRisk} onChange={(event) => setWorkRisk(event.target.value as "standard" | "attention" | "critical")} disabled={!organizationContext?.claimed}><option value="standard">Standard</option><option value="attention">Attention</option><option value="critical">Critical</option></select></label><label>Title<input value={workTitle} onChange={(event) => setWorkTitle(event.target.value)} placeholder="e.g. Review operational readiness" disabled={!organizationContext?.claimed} /></label><label>Accountable owner<input value={workOwner} onChange={(event) => setWorkOwner(event.target.value)} placeholder="e.g. Operations Manager" disabled={!organizationContext?.claimed} /></label></div><button className="primary-button" onClick={createWorkItem} disabled={!organizationContext?.claimed || isCreatingWork || workTitle.trim().length < 3}>{isCreatingWork ? "Recording…" : "Record work item"} <ArrowUpRight size={16} /></button>{!organizationContext?.claimed && <p className="seat-helper">Claim or activate your verified organisation access before recording work.</p>}</article>
+              <article className="surface-card work-list-card"><div className="surface-heading"><div><p className="panel-kicker">CURRENT REGISTER</p><h2>Organisation work</h2></div><span className="seat-count-pill">{workItems.length}</span></div><div className="work-list">{workItems.length ? workItems.map((item) => <div className="work-item" key={item.id}><div><span className={`risk-dot risk-dot--${item.risk_level}`} /><strong>{item.title}</strong><p>{item.work_type.replace("_", " ")} · {item.owner_label || "Owner not assigned"}</p></div><span className="work-status">{item.status.replace("_", " ")}</span></div>) : <p className="seat-helper">No projects or priority actions have been recorded yet.</p>}</div></article>
+            </section>
           </section>
         )}
       </section>

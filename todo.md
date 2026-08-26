@@ -36,4 +36,24 @@
 - [x] Connect the authenticated command centre and seat workspace to the verified organisation entitlement, onboarding and activity context.
 - [x] Revoke anonymous and authenticated execution of privileged entitlement-maintenance functions and re-run Supabase security advisories.
 - [x] Verify the public Supabase client is denied when attempting to execute privileged entitlement-maintenance functions.
+- [ ] Validate Stripe test-mode event delivery for Enterprise and additional-seat subscriptions before using live customer payments.
+- [ ] Configure Supabase Auth redirect URLs for the selected public SolumPM host.
+- [ ] Select and configure public hosting for the SolumPM Vite application.
+- [ ] Apply only the hosting-provider-supplied GoDaddy DNS record for solumpm.com and verify the live activation path.
+- [ ] Inspect the signed-in Stripe test-mode destination and confirm the required SolumPM webhook event set before test checkout.
+- [ ] Run non-charging Stripe test-mode verification for the Enterprise and additional-seat entitlement paths.
+- [x] Verify the completed sandbox Enterprise checkout created an active 25-seat SolumPM entitlement before testing the additional-seat block.
+- [x] Diagnose and repair the failed sandbox Stripe deliveries for checkout.session.completed, customer.subscription.created and invoice.paid before retrying entitlement verification.
+- [x] Correct the sandbox Stripe signing-secret mismatch causing 400 webhook rejection, then resend the existing Enterprise sandbox events.
+- [x] Add a secret-safe Stripe signature diagnostic response to distinguish a missing sandbox secret from a mismatched sandbox destination secret.
+- [x] Verify the recovered 200 sandbox Enterprise deliveries created one active entitlement with exactly 25 internal seats.
+- [x] Strengthen authenticated organisation setup, controlled team invitations and 25-seat administration.
+- [x] Add Master Licence Holder internal-seat registration, invite-status visibility and secure Magic Link activation for invited members.
+- [x] Build initial operational workflow surfaces with organisation-scoped activity visibility.
+- [x] Add an organisation-scoped work register for projects and priority actions with controlled submission and command-centre visibility.
+- [ ] Validate the expanded SolumPM program foundation and prepare activation guidance.
+- [ ] Confirm the designated SolumPM Supabase project cvqualjefkorrwiqsxkv remains active and provide its direct dashboard location.
+- [ ] Inspect the active SolumPM Stripe destination’s five selected events and add customer.subscription.created if it is absent.
+- [x] Map sandbox Enterprise price_1U8XgB35eHyM3zBh7O3eLsWN and sandbox additional-seat price_1U8XgR35eHyM3zBh9hWll9k7 for isolated entitlement verification.
+- [x] Configure separate Supabase Edge Function signing secrets for the SolumPM Stripe test-mode and live-mode destinations.
 - [x] Apply a covering index for Stripe subscription-item price lookups and retain currently unused operational indexes until live workload data exists.

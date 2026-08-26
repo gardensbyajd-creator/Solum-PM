@@ -27,6 +27,8 @@ The onboarding route gives the subscriber a branded next step, but it does not g
 | SolumPM Enterprise | `price_1U8GLo3a72jjBENAGvEHaHnO` | 25 named internal seats |
 | SolumPM Additional 25 Internal Seats | `price_1U8GMR3a72jjBENA78NPrMe9` | One additional 25-seat block |
 
+The webhook reads active mappings from the protected `billing_price_mappings` table. Sandbox prices are therefore mapped in the database for controlled non-charging verification, not hardcoded into browser code or the webhook source.
+
 ## Stripe Workbench configuration
 
 Create one event destination with the following events:
@@ -40,13 +42,16 @@ Create one event destination with the following events:
 | `customer.subscription.updated` | Updates subscription status, items and the calculated seat allowance. |
 | `customer.subscription.deleted` | Removes the associated base or additional-seat entitlement. |
 
-After saving the event destination, Stripe displays a signing secret starting with `whsec_`. In Supabase, add it as the edge-function secret named:
+After saving each event destination, Stripe displays a signing secret starting with `whsec_`. In Supabase Edge Function secrets, use these separate names:
 
-```text
-STRIPE_WEBHOOK_SECRET
-```
+| Stripe destination | Supabase secret name |
+|---|---|
+| Live-mode destination | `STRIPE_WEBHOOK_SECRET` |
+| Test-mode destination | `STRIPE_TEST_WEBHOOK_SECRET` |
 
-Never place this secret in frontend code, the public Payment Link URL, source control or chat.
+The webhook accepts a valid signature from either configured destination. Never place either secret in frontend code, the public Payment Link URL, source control or chat.
+
+If Stripe shows a `400` signature-verification response, reveal the `whsec_...` value from the exact destination that delivered the failed event and replace the corresponding Supabase secret. A live and sandbox destination always have different signing secrets; do not interchange them.
 
 ## Additional-seat safety rule
 
@@ -57,7 +62,7 @@ The production experience should be an in-app **Add 25 seats** action available 
 ## Test sequence
 
 1. Create the event destination in Stripe test mode.
-2. Store the test-mode `STRIPE_WEBHOOK_SECRET` in the Supabase edge-function secrets.
+2. Store the test-mode `STRIPE_TEST_WEBHOOK_SECRET` in the Supabase Edge Function secrets.
 3. Send a Stripe test event and confirm an event row appears in `stripe_webhook_events`.
 4. Test an Enterprise subscription and confirm `organization_entitlements.internal_seat_limit` is 25.
 5. Test a linked additional-seat item and confirm the limit becomes 50.

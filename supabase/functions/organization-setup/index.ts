@@ -80,6 +80,31 @@ Deno.serve(async (request) => {
     if (memberCreateError) return json({ error: "Unable to claim organisation access" }, 500);
   }
 
+  const { data: existingSeat, error: seatReadError } = await admin
+    .from("organization_seats")
+    .select("id, seat_status")
+    .eq("organization_id", organization.id)
+    .ilike("email", userData.user.email)
+    .in("seat_status", ["invited", "active"])
+    .maybeSingle();
+  if (seatReadError) return json({ error: "Unable to confirm Master Licence Holder seat" }, 500);
+  if (!existingSeat) {
+    const { error: seatCreateError } = await admin.from("organization_seats").insert({
+      organization_id: organization.id,
+      email: userData.user.email.toLowerCase(),
+      display_name: userData.user.user_metadata?.full_name ?? null,
+      role_name: "master_licence_holder",
+      seat_status: "active",
+      activated_at: new Date().toISOString(),
+    });
+    if (seatCreateError) return json({ error: "Unable to register the Master Licence Holder seat" }, 500);
+  } else if (existingSeat.seat_status === "invited") {
+    const { error: seatActivateError } = await admin.from("organization_seats")
+      .update({ seat_status: "active", activated_at: new Date().toISOString() })
+      .eq("id", existingSeat.id);
+    if (seatActivateError) return json({ error: "Unable to activate the Master Licence Holder seat" }, 500);
+  }
+
   const currentStep = Math.max(1, Math.min(5, Math.floor(input.currentStep ?? 1)));
   const status = input.complete ? "completed" : currentStep >= 5 ? "ready_for_review" : "in_progress";
   const { error: onboardingError } = await admin.from("organization_onboarding_sessions").upsert({

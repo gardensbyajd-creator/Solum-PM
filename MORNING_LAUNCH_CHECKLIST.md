@@ -6,14 +6,14 @@ The application foundation, Supabase schema and Edge Functions are deployed. Com
 
 - [ ] Ensure the single **SolumPM subscription entitlements** destination includes `checkout.session.completed`, `customer.subscription.created`, `customer.subscription.updated`, `customer.subscription.deleted`, `invoice.paid`, and `invoice.payment_failed`.
 - [ ] Confirm its endpoint is `https://cvqualjefkorrwiqsxkv.supabase.co/functions/v1/stripe-webhook`.
-- [ ] Confirm `STRIPE_WEBHOOK_SECRET` holds the destination’s test-mode signing secret in Supabase Edge Function secrets.
+- [ ] Store the test-mode destination signing secret as `STRIPE_TEST_WEBHOOK_SECRET` in Supabase Edge Function secrets.
 - [ ] Complete a Stripe **test-mode** Enterprise checkout and verify that a new organisation receives a 25-seat active entitlement.
 - [ ] Complete a Stripe **test-mode** additional-seat subscription linked to that organisation and verify that its capacity becomes 50 seats.
 
 ## 2. Stripe live-mode configuration
 
 - [ ] Repeat the event-destination configuration in **live mode**, using a separate live-mode `whsec_...` signing secret.
-- [ ] Replace the Edge Function secret with the live-mode signing secret only when moving live, or use a controlled environment cutover process.
+- [ ] Store the live-mode destination signing secret separately as `STRIPE_WEBHOOK_SECRET`; do not replace the test-mode secret during initial live cutover.
 - [ ] Confirm the Enterprise Payment Link price is A$55/month + GST for the first 25 named internal users.
 - [ ] Confirm the additional-seat price is A$25/month + GST for one fixed block of 25 internal seats, with quantity adjustment disabled until controlled in-app purchase linking is available.
 - [ ] Enable terms acceptance only after live Terms of Service and Privacy Policy URLs have been reviewed and configured in Stripe.

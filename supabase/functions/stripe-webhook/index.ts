@@ -1,8 +1,6 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
 
-const enterprisePriceId = "price_1U8GLo3a72jjBENAGvEHaHnO";
-const additionalSeatPriceId = "price_1U8GMR3a72jjBENA78NPrMe9";
 const acceptedStatuses = new Set(["active", "trialing", "past_due"]);
 
 type StripeEvent = {
@@ -103,12 +101,19 @@ async function syncSubscription(supabase: ReturnType<typeof createClient>, subsc
     }, { onConflict: "stripe_subscription_id" });
   if (subscriptionError) throw subscriptionError;
 
+  const { data: activeMappings, error: mappingsError } = await supabase
+    .from("billing_price_mappings")
+    .select("stripe_price_id")
+    .eq("active", true);
+  if (mappingsError) throw mappingsError;
+  const mappedPriceIds = new Set((activeMappings ?? []).map((mapping) => mapping.stripe_price_id));
+
   const items = (subscription.items as { data?: Array<Record<string, unknown>> } | undefined)?.data ?? [];
   const relevantItems = items.flatMap((item) => {
     const price = item.price as Record<string, unknown> | undefined;
     const priceId = stringValue(price?.id);
     const itemId = stringValue(item.id);
-    if (!itemId || !priceId || ![enterprisePriceId, additionalSeatPriceId].includes(priceId)) return [];
+    if (!itemId || !priceId || !mappedPriceIds.has(priceId)) return [];
     return [{
       stripe_subscription_item_id: itemId,
       stripe_subscription_id: stripeSubscriptionId,
@@ -134,14 +139,28 @@ async function syncSubscription(supabase: ReturnType<typeof createClient>, subsc
 Deno.serve(async (request) => {
   if (request.method !== "POST") return json({ error: "Method not allowed" }, 405);
 
-  const webhookSecret = Deno.env.get("STRIPE_WEBHOOK_SECRET");
+  const webhookSecrets = [
+    Deno.env.get("STRIPE_WEBHOOK_SECRET"),
+    Deno.env.get("STRIPE_TEST_WEBHOOK_SECRET"),
+  ].filter((secret): secret is string => Boolean(secret));
   const supabaseUrl = Deno.env.get("SUPABASE_URL");
   const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
-  if (!webhookSecret || !supabaseUrl || !serviceRoleKey) return json({ error: "Webhook configuration incomplete" }, 503);
+  if (webhookSecrets.length === 0 || !supabaseUrl || !serviceRoleKey) return json({ error: "Webhook configuration incomplete" }, 503);
 
   const rawBody = await request.text();
-  const verified = await verifyStripeSignature(rawBody, request.headers.get("stripe-signature"), webhookSecret);
-  if (!verified) return json({ error: "Invalid Stripe signature" }, 400);
+  const signatureHeader = request.headers.get("stripe-signature");
+  const verificationResults = await Promise.all(
+    webhookSecrets.map((secret) => verifyStripeSignature(rawBody, signatureHeader, secret)),
+  );
+  const verified = verificationResults.some(Boolean);
+  if (!verified) {
+    console.warn(JSON.stringify({
+      event: "stripe_signature_unverified",
+      configuredSecretCount: webhookSecrets.length,
+      signatureHeaderPresent: Boolean(signatureHeader),
+    }));
+    return json({ error: "Stripe signature could not be verified. Confirm the matching destination signing secret." }, 400);
+  }
 
   let event: StripeEvent;
   try {
