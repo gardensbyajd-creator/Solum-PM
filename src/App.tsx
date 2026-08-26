@@ -12,6 +12,7 @@ import {
   ClipboardList,
   CreditCard,
   Gauge,
+  History,
   LayoutDashboard,
   ListTodo,
   LockKeyhole,
@@ -24,7 +25,7 @@ import { emptyOnboardingDraft, isStepReady, onboardingProgress, onboardingSteps,
 import { hasCheckoutReturn, isPublicLandingPath, resolveInitialWorkspaceView } from "./lib/routing";
 import { canManageInternalSeats, internalSeatRoles, isSeatInviteReady, normaliseSeatInvite, type InternalSeatRole } from "./lib/seatAdmin";
 
-type WorkspaceView = "command" | "onboarding" | "seats" | "work" | "library" | "reports" | "inbox";
+type WorkspaceView = "command" | "onboarding" | "seats" | "work" | "library" | "reports" | "inbox" | "audit";
 
 type OrganizationContext = {
   claimed: boolean;
@@ -34,7 +35,7 @@ type OrganizationContext = {
   occupiedSeats?: number;
   role?: string;
   seats?: Array<{ id: string; email: string; display_name: string | null; role_name: string; seat_status: "invited" | "active" | "released"; invited_at: string; activated_at: string | null }>;
-  activity?: Array<{ title: string; detail: string | null; created_at: string }>;
+  activity?: Array<{ event_type: string; title: string; detail: string | null; actor_label: string | null; created_at: string }>;
   workItems?: Array<{ id: string; work_type: "project" | "priority_action"; title: string; detail: string | null; status: "planned" | "in_progress" | "blocked" | "complete"; risk_level: "standard" | "attention" | "critical"; owner_label: string | null; due_date: string | null; created_at: string; updated_at: string }>;
   libraryItems?: Array<{ id: string; resource_type: "policy" | "procedure" | "form"; title: string; lifecycle_status: "draft" | "active" | "retired"; current_version: string; owner_label: string | null; review_date: string | null; created_at: string; updated_at: string }>;
 };
@@ -364,6 +365,9 @@ export default function App() {
           <button className={view === "inbox" ? "nav-item nav-item--active" : "nav-item"} onClick={() => jumpTo("inbox")}>
             <BellRing size={18} aria-hidden="true" /> Action inbox {inboxItems.length ? <em>{inboxItems.length}</em> : null}
           </button>
+          <button className={view === "audit" ? "nav-item nav-item--active" : "nav-item"} onClick={() => jumpTo("audit")}>
+            <History size={18} aria-hidden="true" /> Audit history
+          </button>
         </nav>
 
         <div className="sidebar-footnote">
@@ -422,7 +426,7 @@ export default function App() {
               <article className="surface-card activity-card">
                 <div className="surface-heading"><div><p className="panel-kicker">UNIFIED ACTIVITY</p><h2>Operational feed</h2></div><button className="text-button">View all <ChevronRight size={15} /></button></div>
                 <div className="activity-list">
-                  {(organizationContext?.activity?.length ? organizationContext.activity.map((item) => ({ title: item.title, detail: item.detail ?? "Organisation activity recorded", icon: ClipboardList })) : activityPlaceholders).map(({ title, detail, icon: Icon }) => (
+                  {(organizationContext?.activity?.length ? organizationContext.activity.slice(0, 5).map((item) => ({ title: item.title, detail: item.detail ?? "Organisation activity recorded", icon: ClipboardList })) : activityPlaceholders).map(({ title, detail, icon: Icon }) => (
                     <div className="activity-item" key={title}><div className="activity-icon"><Icon size={17} /></div><div><h3>{title}</h3><p>{detail}</p></div><span>Pending</span></div>
                   ))}
                 </div>
@@ -505,6 +509,13 @@ export default function App() {
           <section className="content-view inbox-view" aria-labelledby="inbox-title">
             <div className="page-intro compact-intro"><div><p className="eyebrow">ACCOUNTABILITY RADAR</p><h1 id="inbox-title">Keep the next operational decisions in one clear queue.</h1><p className="lead-copy">This inbox derives its content from verified organisation records. It does not create artificial alerts or conceal items that need a named owner.</p></div><span className="inbox-count">{inboxItems.length} open</span></div>
             <article className="surface-card inbox-card"><div className="surface-heading"><div><p className="panel-kicker">ACTION QUEUE</p><h2>Attention requiring follow-through</h2></div><BellRing size={21} /></div><div className="inbox-list">{inboxItems.length ? inboxItems.map((item) => <button className="inbox-item" key={item.id} onClick={() => jumpTo(item.destination)}><span className={`risk-dot risk-dot--${item.tone}`} /><span className="inbox-item-copy"><small>{item.type}</small><strong>{item.title}</strong><p>{item.detail}</p></span><ChevronRight size={18} /></button>) : <div className="inbox-empty"><BadgeCheck size={23} /><div><strong>No verified actions require immediate attention.</strong><p>Continue adding projects, priority actions and controlled-library review dates as operating records become available.</p></div></div>}</div></article>
+          </section>
+        )}
+
+        {view === "audit" && (
+          <section className="content-view audit-view" aria-labelledby="audit-title">
+            <div className="page-intro compact-intro"><div><p className="eyebrow">PROTECTED ORGANISATION AUDIT</p><h1 id="audit-title">Trace what changed, who acted and when it happened.</h1><p className="lead-copy">This audit view is populated from verified organisation events across onboarding, internal seats, work records and controlled-library lifecycle changes.</p></div></div>
+            <article className="surface-card audit-card"><div className="surface-heading"><div><p className="panel-kicker">EVENT HISTORY</p><h2>Organisation control trail</h2></div><History size={21} /></div><div className="audit-list">{organizationContext?.activity?.length ? organizationContext.activity.map((item) => <div className="audit-item" key={`${item.event_type}-${item.created_at}`}><span className="audit-event-type">{item.event_type.replaceAll(".", " · ").replaceAll("_", " ")}</span><div><strong>{item.title}</strong><p>{item.detail || "No additional detail recorded."}</p></div><div className="audit-meta"><span>{item.actor_label || "System"}</span><time dateTime={item.created_at}>{new Date(item.created_at).toLocaleString("en-AU", { day: "numeric", month: "short", year: "numeric", hour: "numeric", minute: "2-digit" })}</time></div></div>) : <div className="inbox-empty"><History size={23} /><div><strong>No verified organisation events are available yet.</strong><p>Audit history begins once a verified entitlement is claimed, work is recorded or controlled-library lifecycle changes occur.</p></div></div>}</div></article>
           </section>
         )}
       </section>

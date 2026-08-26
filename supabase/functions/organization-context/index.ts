@@ -64,7 +64,7 @@ Deno.serve(async (request) => {
     admin.from("organization_entitlements").select("internal_seat_limit, subscription_state").eq("organization_id", organizationId).maybeSingle(),
     admin.from("organization_onboarding_sessions").select("status, current_step").eq("organization_id", organizationId).maybeSingle(),
     admin.from("organization_seats").select("id, email, display_name, role_name, seat_status, invited_at, activated_at").eq("organization_id", organizationId).order("invited_at", { ascending: false }).limit(50),
-    admin.from("operational_activity_events").select("title, detail, created_at").eq("organization_id", organizationId).order("created_at", { ascending: false }).limit(5),
+    admin.from("operational_activity_events").select("event_type, title, detail, actor_label, created_at").eq("organization_id", organizationId).order("created_at", { ascending: false }).limit(100),
     admin.from("operational_work_items").select("id, work_type, title, detail, status, risk_level, owner_label, due_date, created_at, updated_at").eq("organization_id", organizationId).order("updated_at", { ascending: false }).limit(100),
     admin.from("controlled_library_items").select("id, resource_type, title, lifecycle_status, current_version, owner_label, review_date, created_at, updated_at").eq("organization_id", organizationId).order("updated_at", { ascending: false }).limit(100),
   ]);
