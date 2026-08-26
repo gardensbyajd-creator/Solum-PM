@@ -6,6 +6,7 @@ import {
   BookOpen,
   Building2,
   CalendarDays,
+  ChartNoAxesCombined,
   ChevronRight,
   CircleUserRound,
   ClipboardList,
@@ -23,7 +24,7 @@ import { emptyOnboardingDraft, isStepReady, onboardingProgress, onboardingSteps,
 import { hasCheckoutReturn, isPublicLandingPath, resolveInitialWorkspaceView } from "./lib/routing";
 import { canManageInternalSeats, internalSeatRoles, isSeatInviteReady, normaliseSeatInvite, type InternalSeatRole } from "./lib/seatAdmin";
 
-type WorkspaceView = "command" | "onboarding" | "seats" | "work" | "library";
+type WorkspaceView = "command" | "onboarding" | "seats" | "work" | "library" | "reports";
 
 type OrganizationContext = {
   claimed: boolean;
@@ -128,6 +129,9 @@ export default function App() {
   const libraryItems = organizationContext?.libraryItems ?? [];
   const projectCount = workItems.filter((item) => item.work_type === "project").length;
   const priorityCount = workItems.filter((item) => item.work_type === "priority_action" && item.status !== "complete").length;
+  const activeLibraryCount = libraryItems.filter((item) => item.lifecycle_status === "active").length;
+  const attentionWork = workItems.filter((item) => item.status !== "complete" && ["attention", "critical"].includes(item.risk_level));
+  const upcomingWork = workItems.filter((item) => item.status !== "complete" && item.due_date && new Date(`${item.due_date}T00:00:00`).getTime() <= Date.now() + 14 * 86_400_000).sort((a, b) => (a.due_date ?? "").localeCompare(b.due_date ?? ""));
 
   useEffect(() => {
     try {
@@ -348,6 +352,9 @@ export default function App() {
           <button className={view === "library" ? "nav-item nav-item--active" : "nav-item"} onClick={() => jumpTo("library")}>
             <BookOpen size={18} aria-hidden="true" /> Controlled library
           </button>
+          <button className={view === "reports" ? "nav-item nav-item--active" : "nav-item"} onClick={() => jumpTo("reports")}>
+            <ChartNoAxesCombined size={18} aria-hidden="true" /> Decision brief
+          </button>
         </nav>
 
         <div className="sidebar-footnote">
@@ -474,6 +481,14 @@ export default function App() {
               <article className="surface-card work-entry-card"><div className="surface-heading"><div><p className="panel-kicker">NEW CONTROLLED ITEM</p><h2>Register a policy, procedure or form</h2></div><BookOpen size={21} /></div><div className="invite-grid"><label>Item type<select value={libraryType} onChange={(event) => setLibraryType(event.target.value as "policy" | "procedure" | "form")} disabled={!canManageSeats}><option value="policy">Policy</option><option value="procedure">Procedure</option><option value="form">Form</option></select></label><label>Current version<input value={libraryVersion} onChange={(event) => setLibraryVersion(event.target.value)} placeholder="0.1" disabled={!canManageSeats} /></label><label>Title<input value={libraryTitle} onChange={(event) => setLibraryTitle(event.target.value)} placeholder="e.g. Privacy and confidentiality policy" disabled={!canManageSeats} /></label><label>Accountable owner<input value={libraryOwner} onChange={(event) => setLibraryOwner(event.target.value)} placeholder="e.g. Governance lead" disabled={!canManageSeats} /></label><label>Review date<input type="date" value={libraryReviewDate} onChange={(event) => setLibraryReviewDate(event.target.value)} disabled={!canManageSeats} /></label></div><button className="primary-button" onClick={createLibraryItem} disabled={!canManageSeats || isCreatingLibraryItem || libraryTitle.trim().length < 3}>{isCreatingLibraryItem ? "Recording…" : "Record controlled item"} <ArrowUpRight size={16} /></button>{!canManageSeats && <p className="seat-helper">Only the Master Licence Holder or an administrator can register controlled-library items.</p>}</article>
               <article className="surface-card work-list-card"><div className="surface-heading"><div><p className="panel-kicker">REGISTER STATUS</p><h2>Library lifecycle</h2></div><span className="seat-count-pill">{libraryItems.length}</span></div><div className="work-list">{libraryItems.length ? libraryItems.map((item) => <div className="work-item" key={item.id}><div><span className={`risk-dot risk-dot--${item.lifecycle_status === "retired" ? "critical" : item.lifecycle_status === "draft" ? "attention" : "standard"}`} /><strong>{item.title}</strong><p>{item.resource_type} · v{item.current_version} · {item.owner_label || "Owner not assigned"}{item.review_date ? ` · Review ${new Date(`${item.review_date}T00:00:00`).toLocaleDateString("en-AU", { day: "numeric", month: "short", year: "numeric" })}` : ""}</p></div>{canManageSeats ? <select className="work-status-select" value={item.lifecycle_status} disabled={updatingLibraryId === item.id} onChange={(event) => updateLibraryLifecycle(item.id, event.target.value as "draft" | "active" | "retired")}><option value="draft">Draft</option><option value="active">Active</option><option value="retired">Retired</option></select> : <span className="work-status">{item.lifecycle_status}</span>}</div>) : <p className="seat-helper">No controlled-library items have been registered yet.</p>}</div></article>
             </section>
+          </section>
+        )}
+
+        {view === "reports" && (
+          <section className="content-view reports-view" aria-labelledby="reports-title">
+            <div className="page-intro compact-intro"><div><p className="eyebrow">OPERATIONAL DECISION BRIEF</p><h1 id="reports-title">A concise view of what requires leadership attention.</h1><p className="lead-copy">This brief uses the verified organisation work register and controlled-library lifecycle. It does not fabricate live performance measures that have not yet been recorded.</p></div></div>
+            <section className="report-metric-grid" aria-label="Decision brief metrics"><article className="report-metric"><p>Open priority actions</p><strong>{priorityCount}</strong><span>From the organisation work register</span></article><article className="report-metric"><p>Attention signals</p><strong>{attentionWork.length}</strong><span>Attention or critical open items</span></article><article className="report-metric"><p>Due in next 14 days</p><strong>{upcomingWork.length}</strong><span>Open dated commitments</span></article><article className="report-metric"><p>Active controlled items</p><strong>{activeLibraryCount}</strong><span>Policies, procedures and forms</span></article></section>
+            <section className="report-detail-grid"><article className="surface-card report-list-card"><div className="surface-heading"><div><p className="panel-kicker">LEADERSHIP ATTENTION</p><h2>Open risk signals</h2></div><Gauge size={21} /></div><div className="work-list">{attentionWork.length ? attentionWork.map((item) => <div className="work-item" key={item.id}><div><span className={`risk-dot risk-dot--${item.risk_level}`} /><strong>{item.title}</strong><p>{item.risk_level} · {item.owner_label || "Owner not assigned"} · {item.status.replace("_", " ")}</p></div><button className="text-button" onClick={() => jumpTo("work")}>Review <ChevronRight size={15} /></button></div>) : <p className="seat-helper">No attention or critical work items have been recorded.</p>}</div></article><article className="surface-card report-list-card"><div className="surface-heading"><div><p className="panel-kicker">DELIVERY HORIZON</p><h2>Upcoming commitments</h2></div><CalendarDays size={21} /></div><div className="work-list">{upcomingWork.length ? upcomingWork.map((item) => <div className="work-item" key={item.id}><div><strong>{item.title}</strong><p>{item.due_date ? new Date(`${item.due_date}T00:00:00`).toLocaleDateString("en-AU", { day: "numeric", month: "long" }) : "No due date"} · {item.owner_label || "Owner not assigned"}</p></div><span className="work-status">{item.status.replace("_", " ")}</span></div>) : <p className="seat-helper">No open work items are due within the next 14 days.</p>}</div></article></section>
           </section>
         )}
       </section>

@@ -60,3 +60,4 @@
 - [x] Apply a covering index for Stripe subscription-item price lookups and retain currently unused operational indexes until live workload data exists.
 - [x] Add an operational detail workspace with accountable notes and due dates for projects and priority actions.
 - [x] Build an organisation-scoped controlled-library register for policies, procedures and forms with lifecycle status visibility.
+- [x] Add an operational reporting surface that turns verified work, risk and library lifecycle records into a concise decision brief.
