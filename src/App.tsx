@@ -3,6 +3,7 @@ import {
   ArrowUpRight,
   BadgeCheck,
   BellRing,
+  BookOpen,
   Building2,
   CalendarDays,
   ChevronRight,
@@ -22,7 +23,7 @@ import { emptyOnboardingDraft, isStepReady, onboardingProgress, onboardingSteps,
 import { hasCheckoutReturn, isPublicLandingPath, resolveInitialWorkspaceView } from "./lib/routing";
 import { canManageInternalSeats, internalSeatRoles, isSeatInviteReady, normaliseSeatInvite, type InternalSeatRole } from "./lib/seatAdmin";
 
-type WorkspaceView = "command" | "onboarding" | "seats" | "work";
+type WorkspaceView = "command" | "onboarding" | "seats" | "work" | "library";
 
 type OrganizationContext = {
   claimed: boolean;
@@ -34,6 +35,7 @@ type OrganizationContext = {
   seats?: Array<{ id: string; email: string; display_name: string | null; role_name: string; seat_status: "invited" | "active" | "released"; invited_at: string; activated_at: string | null }>;
   activity?: Array<{ title: string; detail: string | null; created_at: string }>;
   workItems?: Array<{ id: string; work_type: "project" | "priority_action"; title: string; detail: string | null; status: "planned" | "in_progress" | "blocked" | "complete"; risk_level: "standard" | "attention" | "critical"; owner_label: string | null; due_date: string | null; created_at: string; updated_at: string }>;
+  libraryItems?: Array<{ id: string; resource_type: "policy" | "procedure" | "form"; title: string; lifecycle_status: "draft" | "active" | "retired"; current_version: string; owner_label: string | null; review_date: string | null; created_at: string; updated_at: string }>;
 };
 
 const localDraftKey = "solumpm.organization-onboarding.draft";
@@ -107,6 +109,13 @@ export default function App() {
   const [workDueDate, setWorkDueDate] = useState("");
   const [isCreatingWork, setIsCreatingWork] = useState(false);
   const [updatingWorkId, setUpdatingWorkId] = useState<string | null>(null);
+  const [libraryTitle, setLibraryTitle] = useState("");
+  const [libraryType, setLibraryType] = useState<"policy" | "procedure" | "form">("policy");
+  const [libraryVersion, setLibraryVersion] = useState("0.1");
+  const [libraryOwner, setLibraryOwner] = useState("");
+  const [libraryReviewDate, setLibraryReviewDate] = useState("");
+  const [isCreatingLibraryItem, setIsCreatingLibraryItem] = useState(false);
+  const [updatingLibraryId, setUpdatingLibraryId] = useState<string | null>(null);
   const isSupabaseConfigured = hasSupabasePublicConfig();
   const progress = onboardingProgress(draft);
   const publicLanding = isPublicLandingPath(window.location.pathname);
@@ -116,6 +125,7 @@ export default function App() {
   const subscriptionIsActive = organizationContext?.entitlement?.subscription_state === "active";
   const canManageSeats = canManageInternalSeats(organizationContext?.role);
   const workItems = organizationContext?.workItems ?? [];
+  const libraryItems = organizationContext?.libraryItems ?? [];
   const projectCount = workItems.filter((item) => item.work_type === "project").length;
   const priorityCount = workItems.filter((item) => item.work_type === "priority_action" && item.status !== "complete").length;
 
@@ -270,6 +280,48 @@ export default function App() {
     setNotice("Work status updated and recorded in the organisation activity feed.");
   };
 
+  const refreshOrganizationContext = async () => {
+    const client = getSupabaseClient();
+    if (!client) return;
+    const { data, error } = await client.functions.invoke("organization-context");
+    if (!error && data) setOrganizationContext(data as OrganizationContext);
+  };
+
+  const createLibraryItem = async () => {
+    const client = getSupabaseClient();
+    if (!client || libraryTitle.trim().length < 3) {
+      setNotice("Enter a clear controlled-library title before recording it.");
+      return;
+    }
+    setIsCreatingLibraryItem(true);
+    const { error } = await client.functions.invoke("controlled-library-items", { body: { resourceType: libraryType, title: libraryTitle.trim(), currentVersion: libraryVersion.trim(), ownerLabel: libraryOwner.trim(), reviewDate: libraryReviewDate } });
+    setIsCreatingLibraryItem(false);
+    if (error) {
+      setNotice(error.message);
+      return;
+    }
+    await refreshOrganizationContext();
+    setLibraryTitle("");
+    setLibraryVersion("0.1");
+    setLibraryOwner("");
+    setLibraryReviewDate("");
+    setNotice("Controlled-library item recorded as a draft.");
+  };
+
+  const updateLibraryLifecycle = async (id: string, lifecycleStatus: "draft" | "active" | "retired") => {
+    const client = getSupabaseClient();
+    if (!client) return;
+    setUpdatingLibraryId(id);
+    const { error } = await client.functions.invoke("controlled-library-items", { method: "PATCH", body: { id, lifecycleStatus } });
+    setUpdatingLibraryId(null);
+    if (error) {
+      setNotice(error.message);
+      return;
+    }
+    await refreshOrganizationContext();
+    setNotice("Controlled-library lifecycle updated and recorded in the activity feed.");
+  };
+
   if (publicLanding) return <PublicLanding />;
 
   return (
@@ -292,6 +344,9 @@ export default function App() {
           </button>
           <button className={view === "work" ? "nav-item nav-item--active" : "nav-item"} onClick={() => jumpTo("work")}>
             <ListTodo size={18} aria-hidden="true" /> Work register
+          </button>
+          <button className={view === "library" ? "nav-item nav-item--active" : "nav-item"} onClick={() => jumpTo("library")}>
+            <BookOpen size={18} aria-hidden="true" /> Controlled library
           </button>
         </nav>
 
@@ -408,6 +463,16 @@ export default function App() {
             <section className="work-register-grid">
               <article className="surface-card work-entry-card"><div className="surface-heading"><div><p className="panel-kicker">NEW REGISTER ITEM</p><h2>Capture a project or priority action</h2></div><ListTodo size={21} /></div><div className="invite-grid"><label>Record type<select value={workType} onChange={(event) => setWorkType(event.target.value as "project" | "priority_action")} disabled={!organizationContext?.claimed}><option value="priority_action">Priority action</option><option value="project">Project</option></select></label><label>Risk signal<select value={workRisk} onChange={(event) => setWorkRisk(event.target.value as "standard" | "attention" | "critical")} disabled={!organizationContext?.claimed}><option value="standard">Standard</option><option value="attention">Attention</option><option value="critical">Critical</option></select></label><label>Title<input value={workTitle} onChange={(event) => setWorkTitle(event.target.value)} placeholder="e.g. Review operational readiness" disabled={!organizationContext?.claimed} /></label><label>Accountable owner<input value={workOwner} onChange={(event) => setWorkOwner(event.target.value)} placeholder="e.g. Operations Manager" disabled={!organizationContext?.claimed} /></label><label>Due date<input type="date" value={workDueDate} onChange={(event) => setWorkDueDate(event.target.value)} disabled={!organizationContext?.claimed} /></label><label>Operating note<input value={workDetail} onChange={(event) => setWorkDetail(event.target.value)} placeholder="Context, decision or next step" disabled={!organizationContext?.claimed} /></label></div><button className="primary-button" onClick={createWorkItem} disabled={!organizationContext?.claimed || isCreatingWork || workTitle.trim().length < 3}>{isCreatingWork ? "Recording…" : "Record work item"} <ArrowUpRight size={16} /></button>{!organizationContext?.claimed && <p className="seat-helper">Claim or activate your verified organisation access before recording work.</p>}</article>
               <article className="surface-card work-list-card"><div className="surface-heading"><div><p className="panel-kicker">CURRENT REGISTER</p><h2>Organisation work</h2></div><span className="seat-count-pill">{workItems.length}</span></div><div className="work-list">{workItems.length ? workItems.map((item) => <div className="work-item" key={item.id}><div><span className={`risk-dot risk-dot--${item.risk_level}`} /><strong>{item.title}</strong><p>{item.work_type.replace("_", " ")} · {item.owner_label || "Owner not assigned"}{item.due_date ? ` · Due ${new Date(`${item.due_date}T00:00:00`).toLocaleDateString("en-AU", { day: "numeric", month: "short" })}` : ""}</p>{item.detail && <p className="work-detail">{item.detail}</p>}</div>{canManageSeats ? <select className="work-status-select" value={item.status} disabled={updatingWorkId === item.id} onChange={(event) => updateWorkStatus(item.id, event.target.value as "planned" | "in_progress" | "blocked" | "complete")}><option value="planned">Planned</option><option value="in_progress">In progress</option><option value="blocked">Blocked</option><option value="complete">Complete</option></select> : <span className="work-status">{item.status.replace("_", " ")}</span>}</div>) : <p className="seat-helper">No projects or priority actions have been recorded yet.</p>}</div></article>
+            </section>
+          </section>
+        )}
+
+        {view === "library" && (
+          <section className="content-view library-view" aria-labelledby="library-title">
+            <div className="page-intro compact-intro"><div><p className="eyebrow">CONTROLLED LIBRARY</p><h1 id="library-title">Keep the operating system’s evidence governed from the start.</h1><p className="lead-copy">Record policies, procedures and forms with a visible lifecycle, version and accountable owner before the library expands into controlled release workflows.</p></div></div>
+            <section className="work-register-grid">
+              <article className="surface-card work-entry-card"><div className="surface-heading"><div><p className="panel-kicker">NEW CONTROLLED ITEM</p><h2>Register a policy, procedure or form</h2></div><BookOpen size={21} /></div><div className="invite-grid"><label>Item type<select value={libraryType} onChange={(event) => setLibraryType(event.target.value as "policy" | "procedure" | "form")} disabled={!canManageSeats}><option value="policy">Policy</option><option value="procedure">Procedure</option><option value="form">Form</option></select></label><label>Current version<input value={libraryVersion} onChange={(event) => setLibraryVersion(event.target.value)} placeholder="0.1" disabled={!canManageSeats} /></label><label>Title<input value={libraryTitle} onChange={(event) => setLibraryTitle(event.target.value)} placeholder="e.g. Privacy and confidentiality policy" disabled={!canManageSeats} /></label><label>Accountable owner<input value={libraryOwner} onChange={(event) => setLibraryOwner(event.target.value)} placeholder="e.g. Governance lead" disabled={!canManageSeats} /></label><label>Review date<input type="date" value={libraryReviewDate} onChange={(event) => setLibraryReviewDate(event.target.value)} disabled={!canManageSeats} /></label></div><button className="primary-button" onClick={createLibraryItem} disabled={!canManageSeats || isCreatingLibraryItem || libraryTitle.trim().length < 3}>{isCreatingLibraryItem ? "Recording…" : "Record controlled item"} <ArrowUpRight size={16} /></button>{!canManageSeats && <p className="seat-helper">Only the Master Licence Holder or an administrator can register controlled-library items.</p>}</article>
+              <article className="surface-card work-list-card"><div className="surface-heading"><div><p className="panel-kicker">REGISTER STATUS</p><h2>Library lifecycle</h2></div><span className="seat-count-pill">{libraryItems.length}</span></div><div className="work-list">{libraryItems.length ? libraryItems.map((item) => <div className="work-item" key={item.id}><div><span className={`risk-dot risk-dot--${item.lifecycle_status === "retired" ? "critical" : item.lifecycle_status === "draft" ? "attention" : "standard"}`} /><strong>{item.title}</strong><p>{item.resource_type} · v{item.current_version} · {item.owner_label || "Owner not assigned"}{item.review_date ? ` · Review ${new Date(`${item.review_date}T00:00:00`).toLocaleDateString("en-AU", { day: "numeric", month: "short", year: "numeric" })}` : ""}</p></div>{canManageSeats ? <select className="work-status-select" value={item.lifecycle_status} disabled={updatingLibraryId === item.id} onChange={(event) => updateLibraryLifecycle(item.id, event.target.value as "draft" | "active" | "retired")}><option value="draft">Draft</option><option value="active">Active</option><option value="retired">Retired</option></select> : <span className="work-status">{item.lifecycle_status}</span>}</div>) : <p className="seat-helper">No controlled-library items have been registered yet.</p>}</div></article>
             </section>
           </section>
         )}
