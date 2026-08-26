@@ -1,6 +1,7 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
 
 type WorkItemInput = {
+  id?: string;
   workType?: "project" | "priority_action";
   title?: string;
   detail?: string;
@@ -50,7 +51,7 @@ Deno.serve(async (request) => {
     return json({ items: data ?? [] });
   }
 
-  if (request.method !== "POST") return json({ error: "Method not allowed" }, 405);
+  if (request.method !== "POST" && request.method !== "PATCH") return json({ error: "Method not allowed" }, 405);
   let input: WorkItemInput;
   try {
     input = await request.json() as WorkItemInput;
@@ -61,7 +62,26 @@ Deno.serve(async (request) => {
   const workType = input.workType;
   const status = input.status ?? "planned";
   const riskLevel = input.riskLevel ?? "standard";
-  if (!workType || !["project", "priority_action"].includes(workType) || title.length < 3 || title.length > 180 || !["planned", "in_progress", "blocked", "complete"].includes(status) || !["standard", "attention", "critical"].includes(riskLevel)) {
+  if (request.method === "PATCH") {
+    if (!input.id || !["planned", "in_progress", "blocked", "complete"].includes(status)) return json({ error: "Provide a work item and a valid status." }, 400);
+    if (!["master_licence_holder", "administrator"].includes(membership.role_name)) return json({ error: "Only the Master Licence Holder or an administrator can update work status." }, 403);
+    const { data: updatedItem, error: updateError } = await admin.from("operational_work_items")
+      .update({ status, updated_at: new Date().toISOString() })
+      .eq("id", input.id)
+      .eq("organization_id", membership.organization_id)
+      .select("id, work_type, title, detail, status, risk_level, owner_label, due_date, created_at, updated_at")
+      .maybeSingle();
+    if (updateError || !updatedItem) return json({ error: "Unable to update this organisation work item." }, 500);
+    await admin.from("operational_activity_events").insert({
+      organization_id: membership.organization_id,
+      event_type: `${updatedItem.work_type}.status_updated`,
+      title: "Work status updated",
+      detail: `${updatedItem.title} is now ${status.replace("_", " ")}.`,
+      actor_label: user.email ?? "Organisation administrator",
+    });
+    return json({ item: updatedItem });
+  }
+  if (!workType || !["project", "priority_action"].includes(workType) || title.length < 3 || title.length > 180 || !["planned", "in_progress", "blocked", "complete"].includes(status) || !["standard", "attention", "critical"].includes(riskLevel) || (input.dueDate && !/^\d{4}-\d{2}-\d{2}$/.test(input.dueDate))) {
     return json({ error: "Provide a work type, title, status and risk level." }, 400);
   }
   if (workType === "project" && !["master_licence_holder", "administrator"].includes(membership.role_name)) {

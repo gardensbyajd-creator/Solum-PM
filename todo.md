@@ -51,9 +51,11 @@
 - [x] Add Master Licence Holder internal-seat registration, invite-status visibility and secure Magic Link activation for invited members.
 - [x] Build initial operational workflow surfaces with organisation-scoped activity visibility.
 - [x] Add an organisation-scoped work register for projects and priority actions with controlled submission and command-centre visibility.
+- [x] Add role-aware operational work-status updates and activity records for registered projects and priority actions.
 - [ ] Validate the expanded SolumPM program foundation and prepare activation guidance.
 - [ ] Confirm the designated SolumPM Supabase project cvqualjefkorrwiqsxkv remains active and provide its direct dashboard location.
 - [ ] Inspect the active SolumPM Stripe destination’s five selected events and add customer.subscription.created if it is absent.
 - [x] Map sandbox Enterprise price_1U8XgB35eHyM3zBh7O3eLsWN and sandbox additional-seat price_1U8XgR35eHyM3zBh9hWll9k7 for isolated entitlement verification.
 - [x] Configure separate Supabase Edge Function signing secrets for the SolumPM Stripe test-mode and live-mode destinations.
 - [x] Apply a covering index for Stripe subscription-item price lookups and retain currently unused operational indexes until live workload data exists.
+- [x] Add an operational detail workspace with accountable notes and due dates for projects and priority actions.

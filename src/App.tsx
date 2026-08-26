@@ -103,7 +103,10 @@ export default function App() {
   const [workType, setWorkType] = useState<"project" | "priority_action">("priority_action");
   const [workRisk, setWorkRisk] = useState<"standard" | "attention" | "critical">("standard");
   const [workOwner, setWorkOwner] = useState("");
+  const [workDetail, setWorkDetail] = useState("");
+  const [workDueDate, setWorkDueDate] = useState("");
   const [isCreatingWork, setIsCreatingWork] = useState(false);
+  const [updatingWorkId, setUpdatingWorkId] = useState<string | null>(null);
   const isSupabaseConfigured = hasSupabasePublicConfig();
   const progress = onboardingProgress(draft);
   const publicLanding = isPublicLandingPath(window.location.pathname);
@@ -236,7 +239,7 @@ export default function App() {
       return;
     }
     setIsCreatingWork(true);
-    const { error } = await client.functions.invoke("operational-work-items", { body: { workType, title: workTitle.trim(), riskLevel: workRisk, ownerLabel: workOwner.trim() } });
+    const { error } = await client.functions.invoke("operational-work-items", { body: { workType, title: workTitle.trim(), riskLevel: workRisk, ownerLabel: workOwner.trim(), detail: workDetail.trim(), dueDate: workDueDate } });
     setIsCreatingWork(false);
     if (error) {
       setNotice(error.message);
@@ -247,7 +250,24 @@ export default function App() {
     setNotice(`${workType === "project" ? "Project" : "Priority action"} recorded in the organisation work register.`);
     setWorkTitle("");
     setWorkOwner("");
+    setWorkDetail("");
+    setWorkDueDate("");
     setWorkRisk("standard");
+  };
+
+  const updateWorkStatus = async (id: string, status: "planned" | "in_progress" | "blocked" | "complete") => {
+    const client = getSupabaseClient();
+    if (!client) return;
+    setUpdatingWorkId(id);
+    const { error } = await client.functions.invoke("operational-work-items", { method: "PATCH", body: { id, status } });
+    setUpdatingWorkId(null);
+    if (error) {
+      setNotice(error.message);
+      return;
+    }
+    const { data: refreshedContext, error: refreshError } = await client.functions.invoke("organization-context");
+    if (!refreshError && refreshedContext) setOrganizationContext(refreshedContext as OrganizationContext);
+    setNotice("Work status updated and recorded in the organisation activity feed.");
   };
 
   if (publicLanding) return <PublicLanding />;
@@ -386,8 +406,8 @@ export default function App() {
           <section className="content-view work-view" aria-labelledby="work-title">
             <div className="page-intro compact-intro"><div><p className="eyebrow">ORGANISATION WORK REGISTER</p><h1 id="work-title">Record the work that turns readiness into operating rhythm.</h1><p className="lead-copy">Projects and priority actions are held within the verified organisation context, then surfaced in the command centre for accountable follow-through.</p></div></div>
             <section className="work-register-grid">
-              <article className="surface-card work-entry-card"><div className="surface-heading"><div><p className="panel-kicker">NEW REGISTER ITEM</p><h2>Capture a project or priority action</h2></div><ListTodo size={21} /></div><div className="invite-grid"><label>Record type<select value={workType} onChange={(event) => setWorkType(event.target.value as "project" | "priority_action")} disabled={!organizationContext?.claimed}><option value="priority_action">Priority action</option><option value="project">Project</option></select></label><label>Risk signal<select value={workRisk} onChange={(event) => setWorkRisk(event.target.value as "standard" | "attention" | "critical")} disabled={!organizationContext?.claimed}><option value="standard">Standard</option><option value="attention">Attention</option><option value="critical">Critical</option></select></label><label>Title<input value={workTitle} onChange={(event) => setWorkTitle(event.target.value)} placeholder="e.g. Review operational readiness" disabled={!organizationContext?.claimed} /></label><label>Accountable owner<input value={workOwner} onChange={(event) => setWorkOwner(event.target.value)} placeholder="e.g. Operations Manager" disabled={!organizationContext?.claimed} /></label></div><button className="primary-button" onClick={createWorkItem} disabled={!organizationContext?.claimed || isCreatingWork || workTitle.trim().length < 3}>{isCreatingWork ? "Recording…" : "Record work item"} <ArrowUpRight size={16} /></button>{!organizationContext?.claimed && <p className="seat-helper">Claim or activate your verified organisation access before recording work.</p>}</article>
-              <article className="surface-card work-list-card"><div className="surface-heading"><div><p className="panel-kicker">CURRENT REGISTER</p><h2>Organisation work</h2></div><span className="seat-count-pill">{workItems.length}</span></div><div className="work-list">{workItems.length ? workItems.map((item) => <div className="work-item" key={item.id}><div><span className={`risk-dot risk-dot--${item.risk_level}`} /><strong>{item.title}</strong><p>{item.work_type.replace("_", " ")} · {item.owner_label || "Owner not assigned"}</p></div><span className="work-status">{item.status.replace("_", " ")}</span></div>) : <p className="seat-helper">No projects or priority actions have been recorded yet.</p>}</div></article>
+              <article className="surface-card work-entry-card"><div className="surface-heading"><div><p className="panel-kicker">NEW REGISTER ITEM</p><h2>Capture a project or priority action</h2></div><ListTodo size={21} /></div><div className="invite-grid"><label>Record type<select value={workType} onChange={(event) => setWorkType(event.target.value as "project" | "priority_action")} disabled={!organizationContext?.claimed}><option value="priority_action">Priority action</option><option value="project">Project</option></select></label><label>Risk signal<select value={workRisk} onChange={(event) => setWorkRisk(event.target.value as "standard" | "attention" | "critical")} disabled={!organizationContext?.claimed}><option value="standard">Standard</option><option value="attention">Attention</option><option value="critical">Critical</option></select></label><label>Title<input value={workTitle} onChange={(event) => setWorkTitle(event.target.value)} placeholder="e.g. Review operational readiness" disabled={!organizationContext?.claimed} /></label><label>Accountable owner<input value={workOwner} onChange={(event) => setWorkOwner(event.target.value)} placeholder="e.g. Operations Manager" disabled={!organizationContext?.claimed} /></label><label>Due date<input type="date" value={workDueDate} onChange={(event) => setWorkDueDate(event.target.value)} disabled={!organizationContext?.claimed} /></label><label>Operating note<input value={workDetail} onChange={(event) => setWorkDetail(event.target.value)} placeholder="Context, decision or next step" disabled={!organizationContext?.claimed} /></label></div><button className="primary-button" onClick={createWorkItem} disabled={!organizationContext?.claimed || isCreatingWork || workTitle.trim().length < 3}>{isCreatingWork ? "Recording…" : "Record work item"} <ArrowUpRight size={16} /></button>{!organizationContext?.claimed && <p className="seat-helper">Claim or activate your verified organisation access before recording work.</p>}</article>
+              <article className="surface-card work-list-card"><div className="surface-heading"><div><p className="panel-kicker">CURRENT REGISTER</p><h2>Organisation work</h2></div><span className="seat-count-pill">{workItems.length}</span></div><div className="work-list">{workItems.length ? workItems.map((item) => <div className="work-item" key={item.id}><div><span className={`risk-dot risk-dot--${item.risk_level}`} /><strong>{item.title}</strong><p>{item.work_type.replace("_", " ")} · {item.owner_label || "Owner not assigned"}{item.due_date ? ` · Due ${new Date(`${item.due_date}T00:00:00`).toLocaleDateString("en-AU", { day: "numeric", month: "short" })}` : ""}</p>{item.detail && <p className="work-detail">{item.detail}</p>}</div>{canManageSeats ? <select className="work-status-select" value={item.status} disabled={updatingWorkId === item.id} onChange={(event) => updateWorkStatus(item.id, event.target.value as "planned" | "in_progress" | "blocked" | "complete")}><option value="planned">Planned</option><option value="in_progress">In progress</option><option value="blocked">Blocked</option><option value="complete">Complete</option></select> : <span className="work-status">{item.status.replace("_", " ")}</span>}</div>) : <p className="seat-helper">No projects or priority actions have been recorded yet.</p>}</div></article>
             </section>
           </section>
         )}
