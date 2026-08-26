@@ -63,3 +63,4 @@
 - [x] Add an operational reporting surface that turns verified work, risk and library lifecycle records into a concise decision brief.
 - [x] Add a derived action inbox that consolidates due work, risk signals and controlled-library review dates into accountable next steps.
 - [x] Add a protected organisation audit-history workspace with actor, timestamp and lifecycle-event visibility.
+- [x] Optimise SolumPM production dependency chunking after the build warning while retaining the existing preview-host configuration.
