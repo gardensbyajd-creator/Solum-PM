@@ -43,6 +43,19 @@ type OrganizationContext = {
 const localDraftKey = "solumpm.organization-onboarding.draft";
 const enterpriseCheckoutUrl = "https://buy.stripe.com/8x29AMbYG89kaMk0Eq4Vy2c";
 
+const publicDomains = [
+  { persona: "The Operator", animal: "Wolf", focus: "Focused execution and leadership in action.", image: "/manus-storage/solumpm-animal-operator-wolf_19360765.jpg" },
+  { persona: "The Coordinator", animal: "Ant", focus: "Organises complex activity across many moving parts.", image: "/manus-storage/solumpm-animal-coordinator-ant_aade930d.jpg" },
+  { persona: "The Steward", animal: "Elephant", focus: "Wisdom, stability and long-term responsibility.", image: "/manus-storage/solumpm-animal-steward-elephant_172d0f1d.jpg" },
+  { persona: "The Custodian", animal: "Squirrel", focus: "Protects, stores and manages resources carefully.", image: "/manus-storage/solumpm-animal-custodian-squirrel_bba23a71.jpg" },
+  { persona: "The Guardian", animal: "Lion", focus: "Protector and defender of accountable operations.", image: "/manus-storage/solumpm-animal-guardian-lion_cd127a87.jpg" },
+  { persona: "The Requestor", animal: "Bee", focus: "Connects needs, gathers information and drives activity.", image: "/manus-storage/solumpm-animal-requestor-bee_a86640ab.jpg" },
+  { persona: "Business Intelligence", animal: "Fox", focus: "Intelligent, observant, strategic and adaptable.", image: "/manus-storage/solumpm-animal-business-intelligence-fox_6f6b1e49.jpg" },
+  { persona: "Transparency Portal", animal: "Dolphin", focus: "Trust, communication and collaboration.", image: "/manus-storage/solumpm-animal-transparency-dolphin_f2791875.jpg" },
+  { persona: "The Field Partner", animal: "Border Collie", focus: "Reliable, hardworking and capable in the field.", image: "/manus-storage/solumpm-animal-field-partner-border-collie_0550715e.jpg" },
+  { persona: "Release Control", animal: "Meerkat", focus: "Watching, checking and identifying risk before release.", image: "/manus-storage/solumpm-animal-release-control-meerkat_38a59d19.jpg" },
+];
+
 const activityPlaceholders = [
   { title: "Subscription activation", detail: "Waiting for the first verified Stripe subscription event.", icon: CreditCard },
   { title: "Organisation onboarding", detail: "Complete the setup sequence to prepare your controlled workspace.", icon: ClipboardList },
@@ -83,6 +96,7 @@ function PublicLanding() {
         <ol><li><span>01</span><h3>Subscribe</h3><p>Begin with Enterprise membership for the organisation and its first 25 internal seats.</p></li><li><span>02</span><h3>Verify</h3><p>SolumPM verifies the subscription through signed Stripe events before access changes.</p></li><li><span>03</span><h3>Set up</h3><p>The Master Licence Holder claims the organisation and establishes its team, systems and controlled library.</p></li><li><span>04</span><h3>Operate</h3><p>Move into the protected command centre with a clear starting view of readiness and priority work.</p></li></ol>
       </section>
       <section className="public-control-strip"><div><p className="eyebrow">BUILT FOR ACCOUNTABLE GROWTH</p><h2>Internal seats are controlled. External access remains separate.</h2></div><p>SolumPM treats named internal staff as governed seats. Client and contractor portal access can be managed separately from Enterprise internal capacity as the workspace grows.</p></section>
+      <section className="public-domain-gallery" aria-labelledby="domain-gallery-title"><div className="domain-gallery-heading"><div><p className="eyebrow">THE SOL UMPM OPERATING SYSTEM</p><h2 id="domain-gallery-title">Ten operating personas. One connected workplace.</h2></div><p>Each persona gives a familiar human purpose to a governed operating domain, from the team’s daily execution through to release control.</p></div><div className="domain-card-grid">{publicDomains.map((domain) => <article className="public-domain-card" key={domain.persona}><img src={domain.image} alt="" loading="lazy" /><div className="public-domain-overlay" /><div className="public-domain-copy"><span>{domain.animal}</span><h3>{domain.persona}</h3><p>{domain.focus}</p></div></article>)}</div></section>
     </main>
   );
 }
